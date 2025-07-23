@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 
-export default function PassportScreen() {
+export default function EmotionalWeatherScreen() {
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text>Passport Screen</Text>
+      <Text>Emotional Weather Screen</Text>
     </View>
   );
 }

@@ -1,7 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
-  DashboardScreen,
   PassportScreen,
   BurnoutMirrorScreen,
   EmotionalWeatherScreen
@@ -14,9 +13,6 @@ const Tab = createBottomTabNavigator();
 export default function BottomTabNavigator() {
   return (
     <Tab.Navigator>
-      {FEATURES.showDashboard && (
-        <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      )}
       {FEATURES.showPassport && (
         <Tab.Screen name="Passport" component={PassportScreen} />
       )}

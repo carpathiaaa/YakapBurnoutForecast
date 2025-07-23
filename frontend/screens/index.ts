@@ -1,4 +1,4 @@
-export { default as DashboardScreen } from './DashboardScreen';
-export { default as PassportScreen } from './PassportScreen';
+export const PassportScreen = () => null;
+export const DashboardScreen = () => null;
 export { default as BurnoutMirrorScreen } from './BurnoutMirrorScreen';
-export { default as EmotionalWeatherScreen } from './EmotionalWeatherScreen';
+export const EmotionalWeatherScreen = () => null;

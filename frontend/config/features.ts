@@ -1,6 +1,6 @@
 export const FEATURES = {
-  showDashboard: false,
+  showDashboard: true,
   showPassport: true,
-  showBurnoutMirror: false,
-  showWeather: false,
+  showBurnoutMirror: true,
+  showWeather: true
 };

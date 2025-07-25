@@ -90,28 +90,36 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({ title, uiType, options 
         ));
 
       case 'button-select':
-        return options.map(option => (
-          <TouchableOpacity 
-            key={option} 
-            style={[
-              styles.selectButton,
-              { backgroundColor: (value || []).includes(option) ? '#007BFF' : '#ccc' }
-            ]} 
-            onPress={() => {
-              const currentValue = value || [];
-              const exists = currentValue.includes(option);
-              if (exists) {
-                onChange(currentValue.filter((v: string) => v !== option));
-              } else {
-                onChange([...currentValue, option]);
+        return (
+          <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 16, marginVertical: 24 }}>
+            {options.map(option => {
+              const selected = value === option;
+              // Use emoji as icon placeholder for now
+              let icon = '❓';
+              if (extra?.icons && extra.icons[option]) {
+                if (option === 'Onsite') icon = '📍';
+                else if (option === 'Hybrid') icon = '🔄';
+                else if (option === 'Remote') icon = '💼';
+                else icon = '❓';
               }
-            }}
-          >
-            <Text style={{ color: (value || []).includes(option) ? 'white' : 'black' }}>
-              {option}
-            </Text>
-          </TouchableOpacity>
-        ));
+              return (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.workArrangementCard,
+                    selected && styles.workArrangementCardSelected
+                  ]}
+                  onPress={() => onChange(option)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.workArrangementIcon}>{icon}</Text>
+                  <Text style={styles.workArrangementTitle}>{option.toUpperCase()}</Text>
+                  <Text style={styles.workArrangementDesc}>{extra?.descriptions?.[option]}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        );
 
       case 'slider':
         return (
@@ -130,37 +138,38 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({ title, uiType, options 
 
       case 'image-upload':
         return (
-          <View style={styles.imageUploadContainer}>
-            <Text style={styles.imageUploadTitle}>{title}</Text>
-            {value ? (
-              <Image
-                source={{ uri: value }}
-                style={styles.uploadedImage}
-              />
-            ) : (
-              <Text style={styles.noImageText}>No image selected.</Text>
-            )}
-            <Button
-              title="Pick an image"
+          <View style={styles.wireframeImageUploadContainer}>
+            <View style={styles.wireframeImageBox}>
+              {value ? (
+                <Image
+                  source={{ uri: value }}
+                  style={styles.wireframeUploadedImage}
+                />
+              ) : (
+                <Text style={styles.wireframeNoImageText}>No Image Selected</Text>
+              )}
+            </View>
+            <TouchableOpacity
+              style={styles.wireframePickImageButton}
               onPress={async () => {
                 const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
                 if (permissionResult.granted === false) {
                   alert("Permission to access camera roll is required!");
                   return;
                 }
-
                 const pickerResult = await ImagePicker.launchImageLibraryAsync({
                   mediaTypes: ImagePicker.MediaTypeOptions.Images,
                   allowsEditing: true,
                   aspect: [1, 1],
                   quality: 1,
                 });
-
                 if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets[0]) {
                   onChange(pickerResult.assets[0].uri);
                 }
               }}
-            />
+            >
+              <Text style={styles.wireframePickImageButtonText}>PICK AN IMAGE</Text>
+            </TouchableOpacity>
           </View>
         );
 
@@ -224,51 +233,63 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({ title, uiType, options 
         );
 
       case 'time-range': {
+        // Only show a single time range (no weekdays)
         const timeRangeValue = value || {};
-        
+        const from = timeRangeValue.start;
+        const to = timeRangeValue.end;
         return (
-          <View>
-            {extra?.weekdays?.map((day: string) => (
-              <View key={day} style={styles.timeRangeDay}>
-                <Text style={styles.dayLabel}>{day}</Text>
-                
-                <View style={styles.timeButtonsContainer}>
-                  <TouchableOpacity
-                    style={[styles.timeButton, timeRangeValue[day]?.start && styles.timeButtonSelected]}
-                    onPress={() => {
-                      console.log(`Selecting start time for ${day}`);
-                      setActiveDay(day);
-                      setActivePickerType('start');
-                      setTempDate(new Date());
-                    }}
-                  >
-                    <Text style={styles.timeButtonText}>
-                      {timeRangeValue[day]?.start ? `Start: ${timeRangeValue[day].start}` : 'Select Start Time'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.timeButton, timeRangeValue[day]?.end && styles.timeButtonSelected]}
-                    onPress={() => {
-                      console.log(`Selecting end time for ${day}`);
-                      setActiveDay(day);
-                      setActivePickerType('end');
-                      setTempDate(new Date());
-                    }}
-                  >
-                    <Text style={styles.timeButtonText}>
-                      {timeRangeValue[day]?.end ? `End: ${timeRangeValue[day].end}` : 'Select End Time'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-
-            {isPickerVisible && (
+          <View style={{ alignItems: 'center', justifyContent: 'center', marginVertical: 20 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+              <TouchableOpacity
+                style={[styles.timeButton, from && styles.timeButtonSelected]}
+                onPress={() => {
+                  setActivePickerType('start');
+                  setTempDate(new Date());
+                }}
+              >
+                <Text style={styles.timeButtonText}>
+                  {from ? `From: ${from}` : 'From: --:--'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.timeButton, to && styles.timeButtonSelected]}
+                onPress={() => {
+                  setActivePickerType('end');
+                  setTempDate(new Date());
+                }}
+              >
+                <Text style={styles.timeButtonText}>
+                  {to ? `To: ${to}` : 'To: --:--'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {/* Show selected time range summary */}
+            <Text style={{ marginTop: 16, fontSize: 16, color: '#333' }}>
+              {from && to ? `Selected: ${from} - ${to}` : 'Selected: Not set'}
+            </Text>
+            {activePickerType && (
               <DateTimePicker
                 mode="time"
                 value={tempDate}
-                onChange={handleTimeChange}
+                onChange={(_event, selectedDate) => {
+                  if (Platform.OS === 'android') {
+                    setActivePickerType(null);
+                  }
+                  if (selectedDate && activePickerType) {
+                    const formatted = selectedDate.toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
+                    const updatedValue = {
+                      ...timeRangeValue,
+                      [activePickerType]: formatted,
+                    };
+                    onChange(updatedValue);
+                    if (Platform.OS === 'ios') {
+                      setActivePickerType(null);
+                    }
+                  }
+                }}
                 display="default"
               />
             )}
@@ -398,5 +419,84 @@ const styles = StyleSheet.create({
     padding: 8,
     marginTop: 4,
     borderRadius: 5,
-  }
+  },
+  wireframeImageUploadContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginTop: 24,
+    marginBottom: 24,
+  },
+  wireframeImageBox: {
+    width: 180,
+    height: 180,
+    borderWidth: 2,
+    borderColor: '#aaa',
+    borderRadius: 24,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  wireframeUploadedImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 16,
+    resizeMode: 'cover',
+  },
+  wireframeNoImageText: {
+    color: '#888',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  wireframePickImageButton: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#aaa',
+  },
+  wireframePickImageButtonText: {
+    color: '#222',
+    fontWeight: 'bold',
+    fontSize: 16,
+    letterSpacing: 1,
+  },
+  workArrangementCard: {
+    flex: 1,
+    minWidth: 120,
+    maxWidth: 150,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#bbb',
+    alignItems: 'center',
+    padding: 16,
+    marginHorizontal: -2,
+    elevation: 2,
+  },
+  workArrangementCardSelected: {
+    borderColor: '#007BFF',
+    backgroundColor: '#e6f0ff',
+    elevation: 4,
+  },
+  workArrangementIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  workArrangementTitle: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  workArrangementDesc: {
+    fontSize: 13,
+    color: '#444',
+    textAlign: 'center',
+  },
 });

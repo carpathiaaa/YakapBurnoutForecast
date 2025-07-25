@@ -59,8 +59,20 @@ export const onboardingSteps: OnboardingStep[] = [
     id: 'work_arrangement',
     section: 'Work Preferences',
     question: 'Preferred work arrangement',
-    uiType: 'dropdown',
-    options: ['Remote', 'Hybrid', 'Onsite'],
+    uiType: 'button-select',
+    options: ['Onsite', 'Hybrid', 'Remote'],
+    extra: {
+      descriptions: {
+        Onsite: 'Traditional work mode (in-person).',
+        Hybrid: 'Combination of onsite and offsite work.',
+        Remote: 'Most work are completed offsite.'
+      },
+      icons: {
+        Onsite: 'map-marker',
+        Hybrid: 'sync',
+        Remote: 'briefcase'
+      }
+    }
   },
   {
     id: 'productivity_time',
@@ -79,11 +91,9 @@ export const onboardingSteps: OnboardingStep[] = [
   {
     id: 'focus_hours',
     section: 'Focus Hours',
-    question: 'Select your focus hours for each day',
+    question: 'Select your focus hours',
     uiType: 'time-range',
-    extra: {
-      weekdays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    },
+    // No extra.weekdays
   },
   {
     id: 'meeting_tolerance',

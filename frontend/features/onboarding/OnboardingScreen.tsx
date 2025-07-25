@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, FlatList, Dimensions, Button, StyleSheet } from 'react-native';
+import { View, FlatList, Dimensions, Button, StyleSheet, Text } from 'react-native';
 import { onboardingSteps } from './data/onboardingSteps';
 import OnboardingStep from './components/OnboardingStep';
 
@@ -81,17 +81,87 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onDone }) => {
     );
   };
 
+  // New shared header and arc for all onboarding steps
+  const renderOnboardingPage = (item: any, index: number, isProfilePicture: boolean) => {
+    // Dots distributed along the arc
+    const DOT_COUNT = onboardingSteps.length;
+    const DOT_SIZE = 36;
+    const centerX = SCREEN_WIDTH / 2;
+    const centerY = -150;
+    const RADIUS = 200;
+    const ARC_SPAN = Math.PI * 0.6;
+    const ARC_START = -ARC_SPAN / 2;
+    const ROTATION = Math.PI / 2;
+    const arcDots = Array.from({ length: DOT_COUNT }).map((_, i) => {
+      const angle = ARC_START + ARC_SPAN * ((DOT_COUNT - 1 - i) / (DOT_COUNT - 1)) + ROTATION;
+      const x = centerX + RADIUS * Math.cos(angle);
+      const y = centerY + RADIUS * Math.sin(angle);
+      return (
+        <View
+          key={i}
+          style={[
+            styles.passportDot,
+            i === currentIndex ? styles.passportDotActive : null,
+            {
+              position: 'absolute',
+              left: x - DOT_SIZE / 2,
+              top: y - DOT_SIZE / 2,
+              width: DOT_SIZE,
+              height: DOT_SIZE,
+              borderRadius: DOT_SIZE / 2,
+            },
+          ]}
+        />
+      );
+    });
+    return (
+      <View style={styles.profilePageContainer}>
+        <View style={styles.passportHeaderHalfCircle}>
+          <Text style={styles.passportTitle}>Customize your</Text>
+          <Text style={styles.passportSubtitle}>Wellness Passport</Text>
+          <Text style={styles.passportHelper}>Follow the steps below to complete your passport.</Text>
+        </View>
+        <View style={styles.passportStepIndicatorArc}>{arcDots}</View>
+        <View style={styles.passportContainer}>
+          <View style={styles.profileUploadSection}>
+            {isProfilePicture ? (
+              <OnboardingStep
+                title=""
+                uiType="image-upload"
+                value={getDefaultValue(item)}
+                onChange={(val) => handleChange(index, val)}
+              />
+            ) : (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+                <OnboardingStep
+                  title={item.question}
+                  uiType={item.uiType}
+                  options={item.options}
+                  extra={item.extra}
+                  value={getDefaultValue(item)}
+                  onChange={(val) => handleChange(index, val)}
+                />
+              </View>
+            )}
+          </View>
+        </View>
+        <View style={styles.passportButtonRow}>
+          <View style={styles.buttonWrapper}>
+            <Button title={index === onboardingSteps.length - 1 ? 'Finish' : '→ Next'} onPress={handleNext} />
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      {/* Page Indicators */}
-      {renderPageIndicators()}
-      
       <FlatList
         ref={flatListRef}
         data={onboardingSteps}
         horizontal
         pagingEnabled
-        scrollEnabled={true} // Enable swiping
+        scrollEnabled={true}
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id}
         getItemLayout={(data, index) => ({
@@ -99,28 +169,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onDone }) => {
           offset: SCREEN_WIDTH * index,
           index,
         })}
-        renderItem={({ item, index }) => (
-          <View style={styles.pageContainer}>
-            <View style={styles.contentContainer}>
-              <OnboardingStep
-                title={item.question}
-                uiType={item.uiType}
-                options={item.options}
-                extra={item.extra}
-                value={getDefaultValue(item)}
-                onChange={(val) => handleChange(index, val)}
-              />
-            </View>
-            
-            {/* Show button at the bottom of each screen */}
-            <View style={styles.buttonContainer}>
-              <Button
-                title={index === onboardingSteps.length - 1 ? 'Finish' : 'Next'}
-                onPress={handleNext}
-              />
-            </View>
-          </View>
-        )}
+        renderItem={({ item, index }) => {
+          return renderOnboardingPage(item, index, item.id === 'profile_picture');
+        }}
         onMomentumScrollEnd={(event) => {
           const newIndex = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
           setCurrentIndex(newIndex);
@@ -166,6 +217,98 @@ const styles = StyleSheet.create({
   buttonContainer: {
     marginTop: 20,
     marginBottom: 40,
+  },
+  // Profile picture page specific styles
+  profilePageContainer: {
+    width: SCREEN_WIDTH,
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  passportContainer: {
+    alignItems: 'center',
+    padding: 20,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  passportTitle: {
+    fontSize: 18,
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  passportSubtitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 5,
+  },
+  passportHelper: {
+    fontSize: 12,
+    color: '#555',
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 20,
+  },
+  stepIndicator: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 16,
+    marginBottom: 30,
+  },
+  passportDot: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ccc',
+    marginHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  passportDotActive: {
+    backgroundColor: '#007BFF',
+  },
+  profileUploadSection: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  passportButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 40,
+    paddingBottom: 40,
+    gap: 20,
+  },
+  buttonWrapper: {
+    flex: 1,
+  },
+  passportHeaderHalfCircle: {
+    width: '100%',
+    height: 300,
+    backgroundColor: '#f5f5f5',
+    borderBottomLeftRadius: 600,
+    borderBottomRightRadius: 600,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 30,
+    marginBottom: 5,
+  },
+  passportStepIndicatorCurve: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    marginTop: 18,
+    marginBottom: 0,
+    width: '100%',
+    // Optionally, you can add transform or margin to better follow the curve visually
+  },
+  passportStepIndicatorArc: {
+    position: 'absolute',
+    left: 0,
+    top: 300, // Just below the semicircle
+    width: '100%',
+    height: 180,
+    pointerEvents: 'none', // So it doesn't block touches
   },
 });
 

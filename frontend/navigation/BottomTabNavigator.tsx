@@ -3,25 +3,45 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
   PassportScreen,
   BurnoutMirrorScreen,
-  EmotionalWeatherScreen
+  EmotionalWeatherScreen,
+  SettingsScreen,
+  WeeklyCheckinScreen
 } from '../screens';
-
-import { FEATURES } from '../config/features';
+import CustomTabBar from '../components/CustomTabBar';
 
 const Tab = createBottomTabNavigator();
 
 export default function BottomTabNavigator() {
   return (
-    <Tab.Navigator>
-      {FEATURES.showPassport && (
-        <Tab.Screen name="Passport" component={PassportScreen} />
-      )}
-      {FEATURES.showBurnoutMirror && (
-        <Tab.Screen name="Burnout Mirror" component={BurnoutMirrorScreen} />
-      )}
-      {FEATURES.showWeather && (
-        <Tab.Screen name="Weather" component={EmotionalWeatherScreen} />
-      )}
+    <Tab.Navigator 
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <CustomTabBar {...props} />}
+    >
+      <Tab.Screen 
+        name="Settings" 
+        component={SettingsScreen}
+        options={{ tabBarButton: () => null }}
+      />
+      <Tab.Screen 
+        name="Weather" 
+        component={EmotionalWeatherScreen}
+        options={{ tabBarButton: () => null }}
+      />
+      <Tab.Screen 
+        name="Checkin" 
+        component={WeeklyCheckinScreen}
+        options={{ tabBarButton: () => null }}
+      />
+      <Tab.Screen 
+        name="Mirror" 
+        component={BurnoutMirrorScreen}
+        options={{ tabBarButton: () => null }}
+      />
+      <Tab.Screen 
+        name="Passport" 
+        component={PassportScreen}
+        options={{ tabBarButton: () => null }}
+      />
     </Tab.Navigator>
   );
 }

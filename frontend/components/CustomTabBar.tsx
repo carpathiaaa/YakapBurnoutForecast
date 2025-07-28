@@ -11,13 +11,21 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
     { name: 'Passport', icon: '📄' },
   ];
 
+  // Bar height and icon size
+  const BAR_HEIGHT = 64; // px
+  const ICON_SIZE = 64; // px (w-16 h-16)
+  const SIDE_ICON_SIZE = 56; // px (w-14 h-14)
+  const ICON_OVERLAP = ICON_SIZE / 2; // px
+
   return (
-    <View className="bg-[#E5E5E5] rounded-t-2xl shadow-lg border-t border-gray-300 mb-8">
-      {/* Connecting line */}
-      <View className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-700 -translate-y-0.5 z-0" />
-      
-      {/* Tab buttons */}
-      <View className="flex-row items-center justify-around py-4 px-6">
+    <View className="relative" style={{ height: BAR_HEIGHT + ICON_OVERLAP, marginBottom: 32 }}>
+      {/* Bar background */}
+      <View
+        className="absolute left-0 right-0 bottom-0 bg-[#E5E5E5] rounded-t-3xl border-t-4 border-l-4 border-r-4 border-black"
+        style={{ height: BAR_HEIGHT, borderBottomWidth: 0 }}
+      />
+      {/* Icons row */}
+      <View className="absolute left-0 right-0 flex-row items-end justify-around z-20" style={{ top: 0, height: BAR_HEIGHT + ICON_OVERLAP }}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const isFocused = state.index === index;
@@ -29,28 +37,38 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
               target: route.key,
               canPreventDefault: true,
             });
-
             if (!isFocused && !event.defaultPrevented) {
               navigation.navigate(route.name);
             }
+          };
+
+          // Calculate icon position: all icons are shifted up by half their size
+          const iconSize = isCentral ? ICON_SIZE : SIDE_ICON_SIZE;
+          const iconStyle = {
+            width: iconSize,
+            height: iconSize,
+            transform: [{ translateY: -ICON_OVERLAP }],
           };
 
           return (
             <TouchableOpacity
               key={route.key}
               onPress={onPress}
-              className={`items-center justify-center ${
-                isCentral ? 'w-16 h-16' : 'w-14 h-14'
-              }`}
+              style={[
+                { alignItems: 'center', justifyContent: 'center' },
+                iconStyle,
+              ]}
+              activeOpacity={0.8}
             >
               <View
-                className={`items-center justify-center ${
+                className={
                   isCentral
-                    ? 'w-16 h-16 bg-white border-2 border-black rounded-xl shadow-lg'
-                    : 'w-14 h-14 bg-gray-300 rounded-full shadow-md'
-                }`}
+                    ? 'items-center justify-center bg-white border-2 border-black rounded-xl'
+                    : 'items-center justify-center bg-white border-2 border-black rounded-full'
+                }
+                style={{ width: iconSize, height: iconSize }}
               >
-                <Text className={`text-xl ${isCentral ? 'text-black font-bold' : 'text-gray-600'}`}>
+                <Text className={`text-2xl ${isCentral ? 'text-black font-bold' : 'text-gray-600'}`}>
                   {tabIcons[index].icon}
                 </Text>
               </View>

@@ -63,11 +63,12 @@ export const DEFAULT_FORECAST_CONFIG: ForecastConfig = {
     moderate: 0.6,
     high: 0.8
   },
+  // Optimized thresholds based on validation results
   riskThresholds: {
-    low: 30,
-    moderate: 10,
-    high: -10,
-    critical: -30
+    low: 0,      // Was 30 - much more sensitive
+    moderate: -15, // Was 10 - more sensitive
+    high: -25,     // Was -10 - more sensitive
+    critical: -45  // Was -30 - more sensitive
   },
   trendAnalysis: {
     windowDays: 7,

@@ -1,0 +1,2 @@
+export { generateForecast, getLatestForecast, getForecastHistory, saveSignals, getUserSignals, saveUserProfile, getUserProfile } from './cloud-functions/generate-forecast';
+//# sourceMappingURL=index.d.ts.map

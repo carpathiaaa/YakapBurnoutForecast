@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Platform, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Platform, Image, Alert, ActivityIndicator, TextInput } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { useForm, Controller } from 'react-hook-form';
@@ -9,6 +9,10 @@ import PersistentHeader from '../components/PersistentHeader';
 
 interface PassportFormData {
   profileImage: string | null;
+  department: string;
+  productiveTime: string;
+  energizedDays: string;
+  meetingComfort: string;
   workArrangement: 'Onsite' | 'Hybrid' | 'Remote';
   focusHours: { start: string; end: string };
   stressSignals: string[];
@@ -22,6 +26,7 @@ export default function PassportScreen() {
     productiveTime: 'AFTERNOON',
     energizedDays: 'FRI, SAT',
     meetingComfort: 'FREQUENT MEETINGS',
+    department: 'DEPARTMENT',
     stressSignals: '',
     recoveryStrategies: '',
     // Add more fields as needed
@@ -40,6 +45,10 @@ export default function PassportScreen() {
       profileImage: null,
       workArrangement: 'Hybrid',
       focusHours: { start: '09:00', end: '17:00' },
+      department: '',
+      productiveTime: '',
+      energizedDays: '',
+      meetingComfort: '',
       stressSignals: [],
       recoveryStrategies: [],
     },
@@ -52,10 +61,36 @@ export default function PassportScreen() {
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [activeTimeField, setActiveTimeField] = useState<'start' | 'end' | null>(null);
+  const [activeTimeField, setActiveTimeField] = useState<'start' | 'end' | 'productive' | null>(null);
   const [tempDate, setTempDate] = useState(new Date());
+  const [showDepartmentPicker, setShowDepartmentPicker] = useState(false);
+  const [showProductiveTimePicker, setShowProductiveTimePicker] = useState(false);
 
   const workArrangementOptions = ['Onsite', 'Hybrid', 'Remote'];
+  
+  const departmentOptions = [
+    'Engineering',
+    'Marketing', 
+    'Sales',
+    'Human Resources',
+    'Finance',
+    'Operations',
+    'Product',
+    'Design',
+    'Customer Support',
+    'Legal',
+    'IT',
+    'Research & Development'
+  ];
+
+  const productiveTimeOptions = [
+    'Early Morning (6:00 AM - 9:00 AM)',
+    'Morning (9:00 AM - 12:00 PM)',
+    'Afternoon (12:00 PM - 3:00 PM)',
+    'Late Afternoon (3:00 PM - 6:00 PM)',
+    'Evening (6:00 PM - 9:00 PM)',
+    'Late Evening (9:00 PM - 12:00 AM)'
+  ];
 
   // Options from onboardingSteps
   const stressSignalsOptions = [
@@ -153,7 +188,11 @@ export default function PassportScreen() {
         minute: '2-digit',
       });
       
-      setValue(`focusHours.${activeTimeField}`, formatted, { shouldValidate: true });
+      if (activeTimeField === 'productive') {
+        setValue('productiveTime', formatted, { shouldValidate: true });
+      } else {
+        setValue(`focusHours.${activeTimeField}`, formatted, { shouldValidate: true });
+      }
       
       if (Platform.OS === 'ios') {
         setActiveTimeField(null);
@@ -247,9 +286,175 @@ export default function PassportScreen() {
             <Text className="text-xs text-black text-left mb-1">{user.email}</Text>
             <Text className="text-2xl font-extrabold text-black text-left leading-tight mb-1">Wellness{`\n`}Passport</Text>
             <View className="h-0.5 bg-black mb-3 mt-1" />
-            <Text className="text-base text-black mb-2 text-left">Most productive in the{`\n`} <Text className="font-bold">{user.productiveTime}</Text></Text>
-            <Text className="text-base text-black mb-2 text-left">Most energized on{`\n`} <Text className="font-bold">{user.energizedDays}</Text></Text>
-            <Text className="text-base text-black text-left">Comfortable with{`\n`} <Text className="font-bold">{user.meetingComfort}</Text></Text>
+            
+            {/* Department */}
+            <View className="mb-2">
+              <Text className="text-base text-black text-left">Department:</Text>
+              {isEditMode ? (
+                <View className="mt-1">
+                  <TouchableOpacity
+                    className="py-2 px-3 bg-gray-100 rounded-lg border border-gray-300"
+                    onPress={() => setShowDepartmentPicker(!showDepartmentPicker)}
+                    disabled={!isEditMode || isSubmitting}
+                  >
+                    <Text className="text-base font-bold text-black">
+                      {watchedValues.department || 'Select department'}
+                    </Text>
+                  </TouchableOpacity>
+                                     {showDepartmentPicker && (
+                     <View className="mt-1 bg-white border border-gray-300 rounded-lg max-h-32 absolute top-full left-0 right-0 z-10">
+                       <ScrollView 
+                         className="max-h-32"
+                         nestedScrollEnabled={true}
+                         showsVerticalScrollIndicator={false}
+                       >
+                         {departmentOptions.map((dept) => (
+                           <TouchableOpacity
+                             key={dept}
+                             className={`py-2 px-3 border-b border-gray-100 ${
+                               watchedValues.department === dept ? 'bg-purple-100' : ''
+                             }`}
+                             onPress={() => {
+                               setValue('department', dept, { shouldValidate: true });
+                               setShowDepartmentPicker(false);
+                             }}
+                           >
+                             <Text className={`text-sm ${
+                               watchedValues.department === dept ? 'font-bold text-purple-600' : 'text-black'
+                             }`}>
+                               {dept}
+                             </Text>
+                           </TouchableOpacity>
+                         ))}
+                       </ScrollView>
+                     </View>
+                   )}
+                </View>
+              ) : (
+                <Text className="text-base font-bold text-black mt-1">
+                  {watchedValues.department || user.department}
+                </Text>
+              )}
+            </View>
+
+            {/* Productive Time */}
+            <View className="mb-2">
+              <Text className="text-base text-black text-left">Most productive in the:</Text>
+              {isEditMode ? (
+                <View className="mt-1">
+                  <TouchableOpacity
+                    className="py-2 px-3 bg-gray-100 rounded-lg border border-gray-300"
+                    onPress={() => setShowProductiveTimePicker(!showProductiveTimePicker)}
+                    disabled={!isEditMode || isSubmitting}
+                  >
+                    <Text className="text-base font-bold text-black">
+                      {watchedValues.productiveTime || 'Select productive time'}
+                    </Text>
+                  </TouchableOpacity>
+                                     {showProductiveTimePicker && (
+                     <View className="mt-1 bg-white border border-gray-300 rounded-lg max-h-32 absolute top-full left-0 right-0 z-10">
+                       <ScrollView 
+                         className="max-h-32"
+                         nestedScrollEnabled={true}
+                         showsVerticalScrollIndicator={false}
+                       >
+                         {productiveTimeOptions.map((time) => (
+                           <TouchableOpacity
+                             key={time}
+                             className={`py-2 px-3 border-b border-gray-100 ${
+                               watchedValues.productiveTime === time ? 'bg-blue-100' : ''
+                             }`}
+                             onPress={() => {
+                               setValue('productiveTime', time, { shouldValidate: true });
+                               setShowProductiveTimePicker(false);
+                             }}
+                           >
+                             <Text className={`text-sm ${
+                               watchedValues.productiveTime === time ? 'font-bold text-blue-600' : 'text-black'
+                             }`}>
+                               {time}
+                             </Text>
+                           </TouchableOpacity>
+                         ))}
+                       </ScrollView>
+                     </View>
+                   )}
+                </View>
+              ) : (
+                <Text className="text-base font-bold text-black mt-1">
+                  {watchedValues.productiveTime || user.productiveTime}
+                </Text>
+              )}
+            </View>
+
+            {/* Energized Days */}
+            <View className="mb-2">
+              <Text className="text-base text-black text-left">Most energized on:</Text>
+              {isEditMode ? (
+                <View className="mt-1 flex-row flex-wrap gap-2">
+                  {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day) => (
+                    <TouchableOpacity
+                      key={day}
+                      className={`py-1 px-2 rounded-lg border ${
+                        (watchedValues.energizedDays || '').includes(day)
+                          ? 'bg-blue-500 border-blue-600'
+                          : 'bg-white border-gray-300'
+                      }`}
+                      onPress={() => {
+                        const currentDays = watchedValues.energizedDays || '';
+                        const dayList = currentDays.split(', ').filter(d => d);
+                        const newDays = dayList.includes(day)
+                          ? dayList.filter(d => d !== day)
+                          : [...dayList, day];
+                        setValue('energizedDays', newDays.join(', '), { shouldValidate: true });
+                      }}
+                      disabled={!isEditMode || isSubmitting}
+                    >
+                      <Text className={`text-xs font-medium ${
+                        (watchedValues.energizedDays || '').includes(day) ? 'text-white' : 'text-black'
+                      }`}>
+                        {day}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : (
+                <Text className="text-base font-bold text-black mt-1">
+                  {watchedValues.energizedDays || user.energizedDays}
+                </Text>
+              )}
+            </View>
+
+            {/* Meeting Comfort */}
+            <View className="mb-2">
+              <Text className="text-base text-black text-left">Comfortable with:</Text>
+              {isEditMode ? (
+                <View className="mt-1 flex-row flex-wrap gap-2">
+                  {['FREQUENT MEETINGS', 'OCCASIONAL MEETINGS', 'MINIMAL MEETINGS'].map((option) => (
+                    <TouchableOpacity
+                      key={option}
+                      className={`py-1 px-2 rounded-lg border ${
+                        watchedValues.meetingComfort === option
+                          ? 'bg-green-500 border-green-600'
+                          : 'bg-white border-gray-300'
+                      }`}
+                      onPress={() => setValue('meetingComfort', option, { shouldValidate: true })}
+                      disabled={!isEditMode || isSubmitting}
+                    >
+                      <Text className={`text-xs font-medium ${
+                        watchedValues.meetingComfort === option ? 'text-white' : 'text-black'
+                      }`}>
+                        {option}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : (
+                <Text className="text-base font-bold text-black mt-1">
+                  {watchedValues.meetingComfort || user.meetingComfort}
+                </Text>
+              )}
+            </View>
           </View>
         </View>
         {/* Bottom border for the card */}
@@ -330,6 +535,8 @@ export default function PassportScreen() {
           </View>
         </View>
 
+
+
         {/* SECTION: Focus Hours */}
         <View className="mx-4 mt-8">
           <Text className="text-xl font-bold mb-4 text-left">Focus Hours</Text>
@@ -376,6 +583,8 @@ export default function PassportScreen() {
             onChange={handleTimeChange}
           />
         )}
+
+
 
         {/* SECTION: Separator Line */}
         <View className="mx-4 mt-9 h-0.5 bg-black" />

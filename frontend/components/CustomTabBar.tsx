@@ -1,8 +1,11 @@
 import React from 'react';
 import { View, TouchableOpacity, Text } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { useModal } from '../navigation/MainNavigator';
 
 export default function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const { openModal } = useModal();
+
   const tabIcons = [
     { name: 'Settings', icon: '⚙️' },
     { name: 'Weather', icon: '☀️' },
@@ -32,13 +35,18 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
           const isCentral = index === 2; // Plus button is the 3rd item (index 2)
 
           const onPress = () => {
-            const event = navigation.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
+            if (isCentral) {
+              // Open modal for plus button
+              openModal();
+            } else {
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate(route.name);
+              }
             }
           };
 

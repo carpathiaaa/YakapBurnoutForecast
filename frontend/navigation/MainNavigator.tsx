@@ -2,7 +2,7 @@
 import React, { useState, createContext, useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Modal, Pressable, View, Text, TouchableOpacity } from 'react-native';
+import { Modal, Pressable, View, Text, TouchableOpacity, PanResponder, Animated } from 'react-native';
 
 import BottomTabNavigator from './BottomTabNavigator';
 import OnboardingScreen from '../features/onboarding/OnboardingScreen';
@@ -27,9 +27,13 @@ export const useModal = () => {
 };
 
 export default function MainNavigator() {
-  // Simulate onboarding state. Replace with real persisted value later.
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [energyRating, setEnergyRating] = useState(0);
+  const [modalStep, setModalStep] = useState(1); // 1 = energy, 2 = sleep
+  const [sleepHours, setSleepHours] = useState(7);
+  const [isDragging, setIsDragging] = useState(false);
+  const sliderPosition = new Animated.Value((7 / 12) * 260); // Initial position for 7 hours (280 - 20 handle width)
 
   const openModal = () => {
     setIsModalVisible(true);
@@ -37,7 +41,40 @@ export default function MainNavigator() {
 
   const closeModal = () => {
     setIsModalVisible(false);
+    setEnergyRating(0); // Reset rating when modal closes
+    setModalStep(1); // Reset to first step
+    setSleepHours(7); // Reset sleep hours
+    setIsDragging(false);
+    sliderPosition.setValue((7 / 12) * 260);
   };
+
+
+
+  // PanResponder for custom slider
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: (evt, gestureState) => {
+      setIsDragging(true);
+    },
+    onPanResponderMove: (evt, gestureState) => {
+      const sliderWidth = 280;
+      const handleWidth = 20;
+      const maxPosition = sliderWidth - handleWidth;
+      // Calculate position relative to the track start (accounting for modal padding)
+      const trackStartX = 50; // Modal padding + margins
+      const relativeX = gestureState.moveX - trackStartX;
+      // Strict boundary enforcement
+      const clampedPosition = Math.max(0, Math.min(maxPosition, relativeX));
+      sliderPosition.setValue(clampedPosition);
+      const percentage = clampedPosition / maxPosition;
+      const newHours = Math.round(percentage * 12);
+      setSleepHours(newHours);
+    },
+    onPanResponderRelease: () => {
+      setIsDragging(false);
+    },
+  });
 
   const modalContextValue = {
     isModalVisible,
@@ -90,28 +127,228 @@ export default function MainNavigator() {
               padding: 24,
               marginHorizontal: 16,
               width: 320,
-              height: 350,
+              height: 370,
               maxWidth: '90%',
             }}
           >
-            {/* Header with X button */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'black' }}>Weekly Check-in</Text>
+                         {/* Header with X button */}
+             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13, marginTop: 6 }}>
+               <View style={{ flex: 1, alignItems: 'flex-start' }}>
+                 <Text style={{ fontSize: 25, fontWeight: 'bold', color: 'black' }}>Daily Check-in</Text>
+               </View>
               <TouchableOpacity 
                 onPress={closeModal}
                 style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}
               >
-                <Text style={{ fontSize: 24, color: '#666' }}>×</Text>
+                <Text style={{ fontSize: 24, color: '#666' }}>ⓧ</Text>
               </TouchableOpacity>
             </View>
-            
-            {/* Modal content placeholder */}
-            <View style={{ minHeight: 200, justifyContent: 'center', alignItems: 'center' }}>
-              <Text style={{ color: '#666', textAlign: 'center' }}>Modal content will go here</Text>
-            </View>
+
+            <View className="mt-2 mx-1 h-0.5 bg-black mb-2" />
+
+                         {/* Energy Level Question */}
+             <View style={{ marginBottom: 20 }}>
+               <Text style={{ fontSize: 16, color: 'black', textAlign: 'left', lineHeight: 22 }}>
+                 How would you rate your <Text style={{ fontWeight: 'bold' }}>energy level</Text> today?
+               </Text>
+             </View>
+
+             {/* Energy Level Rating */}
+             <View style={{ marginBottom: 30 }}>
+               {/* Rating Labels */}
+               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                 <Text style={{ fontSize: 15, fontWeight: 'bold', color: 'black' }}>1 - Drained</Text>
+                 <Text style={{ fontSize: 15, fontWeight: 'bold', color: 'black' }}>5 - High energy</Text>
+               </View>
+               
+                               {/* Star Rating */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <TouchableOpacity 
+                      key={rating} 
+                      style={{ alignItems: 'center' }}
+                      onPress={() => setEnergyRating(rating)}
+                    >
+                      <Text style={{ fontSize: 20, color: 'black', marginBottom: 2 }}>{rating}</Text>
+                      <Text style={{ fontSize: 50, color: rating <= energyRating ? '#FFD700' : '#E5E5E5' }}>
+                        {rating <= energyRating ? '★' : '☆'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+             </View>
+
+                           {/* Continue Button */}
+              <TouchableOpacity 
+                style={{
+                  backgroundColor: 'white',
+                  borderWidth: 2,
+                  borderColor: 'black',
+                  borderRadius: 12,
+                  paddingVertical: 12,
+                  paddingHorizontal: 20,
+                  alignItems: 'center',
+                  marginTop: -20
+                }}
+                onPress={() => setModalStep(2)}
+              >
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'black' }}>→ Continue</Text>
+                            </TouchableOpacity>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
-    </ModalContext.Provider>
-  );
-}
+        </Modal>
+
+        {/* Sleep Duration Modal Step */}
+        {modalStep === 2 && (
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={isModalVisible}
+            onRequestClose={closeModal}
+            statusBarTranslucent={true}
+          >
+            {/* Backdrop with darkened background */}
+            <Pressable 
+              onPress={closeModal}
+              style={{
+                flex: 1,
+                backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              {/* Modal content */}
+              <Pressable 
+                onPress={(e) => e.stopPropagation()}
+                style={{
+                  backgroundColor: 'white',
+                  borderRadius: 24,
+                  borderWidth: 2,
+                  borderColor: 'black',
+                  padding: 24,
+                  marginHorizontal: 16,
+                  width: 320,
+                  height: 370,
+                  maxWidth: '90%',
+                }}
+              >
+                {/* Header with X button */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13, marginTop: 6 }}>
+                  <View style={{ flex: 1, alignItems: 'flex-start' }}>
+                    <Text style={{ fontSize: 25, fontWeight: 'bold', color: 'black' }}>Weekly Check-in</Text>
+                  </View>
+                  <TouchableOpacity 
+                    onPress={closeModal}
+                    style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Text style={{ fontSize: 24, color: '#666' }}>×</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View className="mt-2 mx-1 h-0.5 bg-black mb-2" />
+
+                {/* Sleep Question */}
+                <View style={{ marginBottom: 20 }}>
+                  <Text style={{ fontSize: 16, color: 'black', textAlign: 'left', lineHeight: 22 }}>
+                    How many <Text style={{ fontWeight: 'bold' }}>hours of sleep</Text> did you get tonight?
+                  </Text>
+                </View>
+
+                {/* Sleep Hours Display */}
+                <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                  <Text style={{ fontSize: 24, fontWeight: 'bold', color: 'black' }}>
+                    {sleepHours} Hour{sleepHours !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+
+                                 {/* Custom Slider */}
+                 <View style={{ marginBottom: 30 }}>
+                                       <View style={{
+                      height: 12,
+                      backgroundColor: 'white',
+                      borderWidth: 1,
+                      borderColor: 'black',
+                      borderRadius: 6,
+                      position: 'relative',
+                      marginHorizontal: 10
+                    }}>
+                                             <Animated.View
+                         {...panResponder.panHandlers}
+                         style={{
+                           position: 'absolute',
+                           left: sliderPosition.interpolate({
+                             inputRange: [0, 260],
+                             outputRange: [0, 260],
+                             extrapolate: 'clamp'
+                           }),
+                           top: -4,
+                           width: 20,
+                           height: 20,
+                           backgroundColor: '#D3D3D3',
+                           borderWidth: 1,
+                           borderColor: 'black',
+                           borderRadius: 10,
+                           marginLeft: -10,
+                           transform: [{ scale: isDragging ? 1.1 : 1 }],
+                           zIndex: 10
+                         }}
+                       />
+                    </View>
+                   
+                   {/* Tap to position overlay */}
+                   <Pressable
+                     style={{
+                       position: 'absolute',
+                       top: -4,
+                       left: 10,
+                       right: 10,
+                       height: 20,
+                       zIndex: 1
+                     }}
+                                           onPress={(event) => {
+                        const { locationX } = event.nativeEvent;
+                        const sliderWidth = 280;
+                        const handleWidth = 20;
+                        const maxPosition = sliderWidth - handleWidth;
+                        // Calculate percentage based on track width
+                        const percentage = Math.max(0, Math.min(1, locationX / sliderWidth));
+                        const newHours = Math.round(percentage * 12);
+                        // Strict boundary enforcement for tap
+                        const clampedPosition = Math.max(0, Math.min(maxPosition, percentage * maxPosition));
+                        setSleepHours(newHours);
+                        sliderPosition.setValue(clampedPosition);
+                      }}
+                   />
+                   
+                 </View>
+
+                {/* Instruction */}
+                <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                  <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
+                    Slide to Adjust
+                  </Text>
+                </View>
+
+                {/* Done Button */}
+                <TouchableOpacity 
+                  style={{
+                    backgroundColor: 'white',
+                    borderWidth: 2,
+                    borderColor: 'black',
+                    borderRadius: 12,
+                    paddingVertical: 12,
+                    paddingHorizontal: 20,
+                    alignItems: 'center',
+                    marginTop: 'auto'
+                  }}
+                  onPress={closeModal}
+                >
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'black' }}>Done!</Text>
+                </TouchableOpacity>
+              </Pressable>
+            </Pressable>
+          </Modal>
+        )}
+      </ModalContext.Provider>
+    );
+  }

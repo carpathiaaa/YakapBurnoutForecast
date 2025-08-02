@@ -29,10 +29,14 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
       />
       {/* Icons row */}
       <View className="absolute left-0 right-0 flex-row items-end justify-around z-20" style={{ top: 0, height: BAR_HEIGHT + ICON_OVERLAP }}>
-        {state.routes.map((route, index) => {
+        {state.routes.filter((route) => {
           const { options } = descriptors[route.key];
-          const isFocused = state.index === index;
-          const isCentral = index === 2; // Plus button is the 3rd item (index 2)
+          return options.tabBarButton !== null;
+        }).map((route, visibleIndex) => {
+          const { options } = descriptors[route.key];
+          const originalIndex = state.routes.findIndex(r => r.key === route.key);
+          const isFocused = state.index === originalIndex;
+          const isCentral = visibleIndex === 2; // Plus button is the 3rd item (index 2)
 
           const onPress = () => {
             if (isCentral) {
@@ -77,7 +81,7 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
                 style={{ width: iconSize, height: iconSize }}
               >
                 <Text className={`text-2xl ${isCentral ? 'text-black font-bold' : 'text-gray-600'}`}>
-                  {tabIcons[index].icon}
+                  {tabIcons[visibleIndex].icon}
                 </Text>
               </View>
             </TouchableOpacity>

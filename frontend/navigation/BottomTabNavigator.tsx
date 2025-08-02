@@ -4,7 +4,8 @@ import {
   PassportScreen,
   BurnoutMirrorScreen,
   EmotionalWeatherScreen,
-  SettingsScreen
+  SettingsScreen,
+  WeeklyCheckinScreen
 } from '../screens';
 import CustomTabBar from '../components/CustomTabBar';
 
@@ -26,7 +27,11 @@ export default function BottomTabNavigator() {
         component={EmotionalWeatherScreen}
         options={{ tabBarButton: () => null }}
       />
-
+      <Tab.Screen 
+        name="Checkin" 
+        component={WeeklyCheckinScreen}
+        options={{ tabBarButton: () => null }}
+      />
       <Tab.Screen 
         name="Mirror" 
         component={BurnoutMirrorScreen}

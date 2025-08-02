@@ -90,6 +90,7 @@ export default function MainNavigator() {
               padding: 24,
               marginHorizontal: 16,
               width: 320,
+              height: 350,
               maxWidth: '90%',
             }}
           >

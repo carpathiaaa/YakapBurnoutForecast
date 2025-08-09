@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, FlatList, Dimensions, Button, StyleSheet, Text } from 'react-native';
 import { onboardingSteps } from './data/onboardingSteps';
 import OnboardingStep from './components/OnboardingStep';
+import { forecastService } from '../../services/forecast-service';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -21,7 +22,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onDone }) => {
     }));
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentIndex < onboardingSteps.length - 1) {
       const nextIndex = currentIndex + 1;
       setCurrentIndex(nextIndex);
@@ -31,7 +32,30 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onDone }) => {
       });
     } else {
       console.log('✅ Onboarding complete. Collected responses:', stepValues);
-      onDone(); // move to the main app or next screen
+      try {
+        // Persist profile and preferences aligned with Wellness Passport
+        await forecastService.saveUserProfile({
+          profile: {
+            profilePictureUri: stepValues['profile_picture'] || null,
+            workArrangement: stepValues['work_arrangement'] || undefined,
+            focusHours: stepValues['focus_hours'] || undefined,
+            productivityTime: stepValues['productivity_time'] || undefined,
+            energizedDays: stepValues['energized_days'] || [],
+            meetingTolerance: stepValues['meeting_tolerance'] ?? undefined,
+            stressSignals: stepValues['stress_signals'] || [],
+            recoveryStrategies: stepValues['recovery_strategies'] || [],
+            department: stepValues['department'] || '',
+          },
+          preferences: {
+            checkInReminders: true,
+            forecastNotifications: true,
+            dataSharing: false,
+          },
+        } as any);
+      } catch (e) {
+        console.warn('Failed to save profile during onboarding', e);
+      }
+      onDone();
     }
   };
 
@@ -46,9 +70,10 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onDone }) => {
     // Set appropriate default values based on UI type
     switch (item.uiType) {
       case 'multi-checkbox':
-      case 'button-select':
       case 'multi-button':
         return [];
+      case 'button-select':
+        return '';
       case 'time-range':
         // Initialize empty object for time ranges
         return {};

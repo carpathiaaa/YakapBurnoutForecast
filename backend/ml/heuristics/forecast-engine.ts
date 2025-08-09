@@ -364,7 +364,7 @@ export class BurnoutForecastEngine {
 
     try {
       // Generate NLP-based recommendations
-      return await recommendationGenerator.generateRecommendations(context);
+       return await recommendationGenerator.generateRecommendations(context);
     } catch (error) {
       console.error('NLP recommendation generation failed:', error);
       

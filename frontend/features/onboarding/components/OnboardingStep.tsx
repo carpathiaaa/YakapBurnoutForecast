@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Button, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Button, Platform, ScrollView } from 'react-native';
 import Slider from '@react-native-community/slider';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Checkbox from 'expo-checkbox';
@@ -61,6 +61,8 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({ title, uiType, options 
       }
     }
   };
+
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const renderOptions = () => {
     switch (uiType) {
@@ -175,16 +177,50 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({ title, uiType, options 
 
       case 'dropdown':
         return (
-          <Picker
-            selectedValue={value}
-            onValueChange={(itemValue) => onChange(itemValue)}
-            style={styles.picker}
-          >
-            <Picker.Item key="placeholder" label="Select an option..." value="" />
-            {options?.map((opt) => (
-              <Picker.Item key={opt} label={opt} value={opt} />
-            ))}
-          </Picker>
+          <View>
+            <TouchableOpacity
+              style={styles.dropdownToggle}
+              onPress={() => setIsDropdownOpen(!isDropdownOpen)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.dropdownToggleText}>
+                {value || 'Select an option...'}
+              </Text>
+              <Text style={styles.dropdownChevron}>{isDropdownOpen ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+            {isDropdownOpen && (
+              <View style={styles.dropdownListContainer}>
+                <ScrollView
+                  style={styles.dropdownList}
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false}
+                >
+                  {options?.map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      style={[
+                        styles.dropdownItem,
+                        value === opt && styles.dropdownItemSelected,
+                      ]}
+                      onPress={() => {
+                        onChange(opt);
+                        setIsDropdownOpen(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownItemText,
+                          value === opt && styles.dropdownItemTextSelected,
+                        ]}
+                      >
+                        {opt}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
         );
 
       case 'single-button':
@@ -368,6 +404,56 @@ const styles = StyleSheet.create({
   picker: {
     height: 50,
     width: '100%',
+  },
+  dropdownToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#aaa',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+  },
+  dropdownToggleText: {
+    fontSize: 16,
+    color: '#111',
+    fontWeight: '600',
+  },
+  dropdownChevron: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+  },
+  dropdownListContainer: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#aaa',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    maxHeight: 160,
+    overflow: 'hidden',
+  },
+  dropdownList: {
+    maxHeight: 160,
+  },
+  dropdownItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  dropdownItemSelected: {
+    backgroundColor: '#eef6ff',
+  },
+  dropdownItemText: {
+    fontSize: 15,
+    color: '#111',
+  },
+  dropdownItemTextSelected: {
+    color: '#0a66c2',
+    fontWeight: '700',
   },
   buttonContainer: {
     flexDirection: 'row',

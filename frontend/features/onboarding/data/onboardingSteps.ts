@@ -75,6 +75,26 @@ export const onboardingSteps: OnboardingStep[] = [
     }
   },
   {
+    id: 'department',
+    section: 'Profile',
+    question: 'Which department are you part of?',
+    uiType: 'dropdown',
+    options: [
+      'Engineering',
+      'Marketing',
+      'Sales',
+      'Human Resources',
+      'Finance',
+      'Operations',
+      'Product',
+      'Design',
+      'Customer Support',
+      'Legal',
+      'IT',
+      'Research & Development'
+    ],
+  },
+  {
     id: 'productivity_time',
     section: 'Work Preferences',
     question: 'When are you most productive during the day?',

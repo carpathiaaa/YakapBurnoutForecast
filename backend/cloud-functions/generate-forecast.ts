@@ -1,18 +1,15 @@
-import { onCall } from 'firebase-functions/v2/https';
+import * as functions from 'firebase-functions';
 import { BurnoutForecastEngine } from '../ml/heuristics/forecast-engine';
 import { ForecastService } from '../firestore/forecast-service';
 import { WellnessSignal } from '../ml/heuristics/scoring-rubric';
 
-// Cloud Function to generate burnout forecast
-export const generateForecast = onCall(
-  {
-    memory: '256MiB',
-    timeoutSeconds: 60,
-    region: 'us-central1'
-  },
-  async (request) => {
+// Cloud Function (Gen 1) to generate burnout forecast
+export const generateForecast = functions
+  .region('us-central1')
+  .runWith({ memory: '256MB', timeoutSeconds: 60 })
+  .https.onCall(async (data, context) => {
     try {
-      const { userId, signals, config } = request.data;
+      const { userId, signals, config } = data || {};
       
       // Validate input
       if (!userId) {
@@ -69,19 +66,15 @@ export const generateForecast = onCall(
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
-  }
-);
+  });
 
-// Cloud Function to get latest forecast
-export const getLatestForecast = onCall(
-  {
-    memory: '128MiB',
-    timeoutSeconds: 30,
-    region: 'us-central1'
-  },
-  async (request) => {
+// Cloud Function (Gen 1) to get latest forecast
+export const getLatestForecast = functions
+  .region('us-central1')
+  .runWith({ memory: '128MB', timeoutSeconds: 30 })
+  .https.onCall(async (data, context) => {
     try {
-      const { userId } = request.data;
+      const { userId } = data || {};
       
       if (!userId) {
         throw new Error('userId is required');
@@ -120,19 +113,15 @@ export const getLatestForecast = onCall(
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
-  }
-);
+  });
 
-// Cloud Function to get forecast history
-export const getForecastHistory = onCall(
-  {
-    memory: '128MiB',
-    timeoutSeconds: 30,
-    region: 'us-central1'
-  },
-  async (request) => {
+// Cloud Function (Gen 1) to get forecast history
+export const getForecastHistory = functions
+  .region('us-central1')
+  .runWith({ memory: '128MB', timeoutSeconds: 30 })
+  .https.onCall(async (data, context) => {
     try {
-      const { userId, limit = 10 } = request.data;
+      const { userId, limit = 10 } = data || {};
       
       if (!userId) {
         throw new Error('userId is required');
@@ -164,19 +153,15 @@ export const getForecastHistory = onCall(
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
-  }
-);
+  });
 
-// Cloud Function to save wellness signals
-export const saveSignals = onCall(
-  {
-    memory: '256MiB',
-    timeoutSeconds: 60,
-    region: 'us-central1'
-  },
-  async (request) => {
+// Cloud Function (Gen 1) to save wellness signals
+export const saveSignals = functions
+  .region('us-central1')
+  .runWith({ memory: '256MB', timeoutSeconds: 60 })
+  .https.onCall(async (data, context) => {
     try {
-      const { userId, signals, source = 'manual' } = request.data;
+      const { userId, signals, source = 'manual' } = data || {};
       
       if (!userId) {
         throw new Error('userId is required');
@@ -211,19 +196,15 @@ export const saveSignals = onCall(
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
-  }
-);
+  });
 
-// Cloud Function to get user signals
-export const getUserSignals = onCall(
-  {
-    memory: '128MiB',
-    timeoutSeconds: 30,
-    region: 'us-central1'
-  },
-  async (request) => {
+// Cloud Function (Gen 1) to get user signals
+export const getUserSignals = functions
+  .region('us-central1')
+  .runWith({ memory: '128MB', timeoutSeconds: 30 })
+  .https.onCall(async (data, context) => {
     try {
-      const { userId, startDate, endDate } = request.data;
+      const { userId, startDate, endDate } = data || {};
       
       if (!userId) {
         throw new Error('userId is required');
@@ -257,19 +238,15 @@ export const getUserSignals = onCall(
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
-  }
-);
+  });
 
-// Cloud Function to save user profile
-export const saveUserProfile = onCall(
-  {
-    memory: '128MiB',
-    timeoutSeconds: 30,
-    region: 'us-central1'
-  },
-  async (request) => {
+// Cloud Function (Gen 1) to save user profile
+export const saveUserProfile = functions
+  .region('us-central1')
+  .runWith({ memory: '128MB', timeoutSeconds: 30 })
+  .https.onCall(async (data, context) => {
     try {
-      const { userId, email, profile, preferences } = request.data;
+      const { userId, email, profile, preferences } = data || {};
       
       if (!userId || !email) {
         throw new Error('userId and email are required');
@@ -295,19 +272,15 @@ export const saveUserProfile = onCall(
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
-  }
-);
+  });
 
-// Cloud Function to get user profile
-export const getUserProfile = onCall(
-  {
-    memory: '128MiB',
-    timeoutSeconds: 30,
-    region: 'us-central1'
-  },
-  async (request) => {
+// Cloud Function (Gen 1) to get user profile
+export const getUserProfile = functions
+  .region('us-central1')
+  .runWith({ memory: '128MB', timeoutSeconds: 30 })
+  .https.onCall(async (data, context) => {
     try {
-      const { userId } = request.data;
+      const { userId } = data || {};
       
       if (!userId) {
         throw new Error('userId is required');
@@ -332,5 +305,4 @@ export const getUserProfile = onCall(
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
-  }
-); 
+  });

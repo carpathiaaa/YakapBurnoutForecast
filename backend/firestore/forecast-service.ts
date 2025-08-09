@@ -1,6 +1,7 @@
 import { db } from '../firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { BurnoutForecast } from '../ml/heuristics/forecast-engine';
+import { GeneratedRecommendation } from '../ml/nlp/recommendation-generator';
 import { WellnessSignal } from '../ml/heuristics/scoring-rubric';
 
 // Firestore collection names
@@ -23,7 +24,7 @@ export interface FirestoreForecast {
     negative: string[];
     neutral: string[];
   };
-  recommendations: string[];
+  recommendations: GeneratedRecommendation[];
   nextCheckIn: Timestamp;
   trend: 'improving' | 'stable' | 'declining' | 'critical';
   signalCount: number;
@@ -32,6 +33,18 @@ export interface FirestoreForecast {
     end: Timestamp;
   };
   processingTime: number;
+  emotionalWeather: {
+    label: string;
+    description: string;
+    intensity: 'calm' | 'mild' | 'moderate' | 'stormy' | 'critical';
+    icon: string;
+  };
+  primaryFactor: {
+    category: string;
+    impact: number;
+    description: string;
+    specificRecommendation: string;
+  };
   version: string; // For future schema migrations
 }
 
@@ -91,6 +104,8 @@ export class ForecastService {
           end: Timestamp.fromDate(forecast.metadata.timeRange.end)
         },
         processingTime: forecast.metadata.processingTime,
+        emotionalWeather: forecast.emotionalWeather,
+        primaryFactor: forecast.primaryFactor,
         version: this.currentVersion
       };
       
@@ -313,6 +328,8 @@ export class ForecastService {
       nextCheckIn: data.nextCheckIn.toDate(),
       trend: data.trend,
       signals: [], // We don't store signals in the forecast document
+      emotionalWeather: data.emotionalWeather,
+      primaryFactor: data.primaryFactor,
       metadata: {
         signalCount: data.signalCount,
         timeRange: {

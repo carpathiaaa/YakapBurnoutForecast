@@ -1,6 +1,8 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { initializeAuth } from 'firebase/auth';
+import * as firebaseAuth from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   FIREBASE_API_KEY,
   FIREBASE_AUTH_DOMAIN,
@@ -20,8 +22,17 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+console.log('[Firebase] Initialized', {
+  projectId: FIREBASE_PROJECT_ID,
+  authDomain: FIREBASE_AUTH_DOMAIN,
+});
 
 const db = getFirestore(app);
-const auth = getAuth(app);
+const auth = initializeAuth(app, {
+  // Use any-cast to access getReactNativePersistence where types may lag behind
+  persistence: (firebaseAuth as any).getReactNativePersistence(AsyncStorage),
+});
+
+// Optional: ensure functions region alignment elsewhere
 
 export { db, auth };

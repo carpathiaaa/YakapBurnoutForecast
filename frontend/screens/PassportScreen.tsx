@@ -20,16 +20,15 @@ interface PassportFormData {
 }
 
 export default function PassportScreen() {
-  // Placeholder data for now
+  // Basic fallback display values (will be overridden by Firestore data)
   const user = {
-    email: 'johndoe@gmail.com',
-    productiveTime: 'AFTERNOON',
-    energizedDays: 'FRI, SAT',
-    meetingComfort: 'FREQUENT MEETINGS',
-    department: 'DEPARTMENT',
+    email: auth.currentUser?.email ?? 'user@example.com',
+    productiveTime: '',
+    energizedDays: '',
+    meetingComfort: '',
+    department: '',
     stressSignals: '',
     recoveryStrategies: '',
-    // Add more fields as needed
   };
 
   // Form state management
@@ -120,13 +119,46 @@ export default function PassportScreen() {
       const currentUser = auth.currentUser;
       if (!currentUser) return;
 
-      const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        if (userData.passport) {
-          reset(userData.passport);
-        }
-      }
+      const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
+      if (!userSnap.exists()) return;
+
+      const data = userSnap.data() as any;
+      const profile = data.profile || {};
+
+      // Map profile.energizedDays (array) to display string like "MON, TUE"
+      const toAbbr = (d: string) => {
+        const map: Record<string, string> = {
+          Monday: 'MON', Tuesday: 'TUE', Wednesday: 'WED', Thursday: 'THU', Friday: 'FRI', Saturday: 'SAT', Sunday: 'SUN',
+        };
+        return map[d] || d.slice(0, 3).toUpperCase();
+      };
+      const energizedDaysDisplay = Array.isArray(profile.energizedDays)
+        ? profile.energizedDays.map((d: string) => toAbbr(d)).join(', ')
+        : '';
+
+      // Map meetingTolerance (0-10) to comfort label
+      const meetingComfortFromTolerance = (n?: number) => {
+        if (typeof n !== 'number') return '';
+        if (n >= 7) return 'FREQUENT MEETINGS';
+        if (n >= 3) return 'OCCASIONAL MEETINGS';
+        return 'MINIMAL MEETINGS';
+      };
+
+      // Reset form with reflected onboarding profile data
+      reset({
+        profileImage: profile.profilePictureUri ?? null,
+        workArrangement: profile.workArrangement ?? 'Hybrid',
+        focusHours: {
+          start: profile.focusHours?.start ?? '09:00',
+          end: profile.focusHours?.end ?? '17:00',
+        },
+        department: profile.department ?? '',
+        productiveTime: profile.productivityTime ?? '',
+        energizedDays: energizedDaysDisplay,
+        meetingComfort: meetingComfortFromTolerance(profile.meetingTolerance),
+        stressSignals: profile.stressSignals ?? [],
+        recoveryStrategies: profile.recoveryStrategies ?? [],
+      });
     } catch (error) {
       console.error('Error loading passport data:', error);
     }
@@ -155,8 +187,41 @@ export default function PassportScreen() {
         return;
       }
 
+      // Map edited Passport fields back to centralized profile structure
+      const energizedArray = (data.energizedDays || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(abbr => {
+          const map: Record<string, string> = { MON: 'Monday', TUE: 'Tuesday', WED: 'Wednesday', THU: 'Thursday', FRI: 'Friday', SAT: 'Saturday', SUN: 'Sunday' };
+          const upper = abbr.toUpperCase();
+          return map[upper] || abbr;
+        });
+
+      const meetingToleranceFromComfort = (label: string): number | undefined => {
+        if (!label) return undefined;
+        if (label.includes('FREQUENT')) return 8;
+        if (label.includes('OCCASIONAL')) return 5;
+        if (label.includes('MINIMAL')) return 1;
+        return undefined;
+      };
+
       await setDoc(doc(db, 'users', currentUser.uid), {
-        passport: data,
+        profile: {
+          profilePictureUri: data.profileImage ?? null,
+          workArrangement: data.workArrangement,
+          focusHours: {
+            start: data.focusHours?.start ?? '09:00',
+            end: data.focusHours?.end ?? '17:00',
+          },
+          productivityTime: data.productiveTime || '',
+          energizedDays: energizedArray,
+          meetingTolerance: meetingToleranceFromComfort(data.meetingComfort),
+          stressSignals: data.stressSignals || [],
+          recoveryStrategies: data.recoveryStrategies || [],
+          department: data.department || '',
+        },
+        lastActive: new Date(),
         updatedAt: new Date(),
       }, { merge: true });
 

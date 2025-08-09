@@ -1,11 +1,23 @@
 // navigation/MainNavigator.tsx
-import React, { useState, createContext, useContext } from 'react';
+import React, { useState, createContext, useContext, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Modal, Pressable, View, Text, TouchableOpacity, PanResponder, Animated } from 'react-native';
+import { Modal, Pressable, View, Text, TouchableOpacity, PanResponder, Animated, Alert } from 'react-native';
+import { onAuthStateChanged, signInWithCredential, GoogleAuthProvider, User } from 'firebase/auth';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+
 
 import BottomTabNavigator from './BottomTabNavigator';
+import LoginScreen from '../screens/LoginScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
+import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import OnboardingScreen from '../features/onboarding/OnboardingScreen';
+import { auth } from '../services/firebase';
+// Using react-native-google-signin instead of Expo Auth Session
+import { forecastService, saveDailyCheckIn, hasDailyCheckInToday, seedDummyDailyData } from '../services/forecast-service';
+import Constants from 'expo-constants';
+
+// Expo WebBrowser not needed with react-native-google-signin
 
 const Stack = createStackNavigator();
 
@@ -28,7 +40,60 @@ export const useModal = () => {
 
 export default function MainNavigator() {
   const [hasOnboarded, setHasOnboarded] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [hasSeededDemoData, setHasSeededDemoData] = useState(false);
+  // Extra config values from app.json
+  const extra = (Constants.expoConfig?.extra || {}) as any;
+
+  // Configure Google Sign-In SDK
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: extra.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+      iosClientId: extra.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+      offlineAccess: true,
+      forceCodeForRefreshToken: false,
+    });
+  }, []);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsub();
+  }, []);
+
+  // TEMP: Seed demo data once after login (remove when not needed)
+  useEffect(() => {
+    const runSeed = async () => {
+      try {
+        if (user && !hasSeededDemoData) {
+          await seedDummyDailyData(50);
+          setHasSeededDemoData(true);
+          console.log('[Seed] Demo data seeded for user');
+        }
+      } catch (e) {
+        console.warn('[Seed] Failed to seed demo data', e);
+      }
+    };
+    runSeed();
+  }, [user, hasSeededDemoData]);
+
+  const handleGoogleSignIn = async () => {
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const result = await GoogleSignin.signIn();
+      const idToken = (result as any)?.data?.idToken || (result as any)?.idToken;
+      if (!idToken) {
+        console.warn('Google Sign-In: missing idToken');
+        return;
+      }
+      const credential = GoogleAuthProvider.credential(idToken);
+      await signInWithCredential(auth, credential);
+    } catch (error) {
+      console.warn('Google Sign-In error', error);
+    }
+  };
+
+  const renderAuthScreen = () => <LoginScreen onContinue={handleGoogleSignIn} />;
   const [energyRating, setEnergyRating] = useState(0);
   const [modalStep, setModalStep] = useState(1); // 1 = energy, 2 = sleep
   const [sleepHours, setSleepHours] = useState(7);
@@ -76,6 +141,25 @@ export default function MainNavigator() {
     },
   });
 
+  const submitCheckIn = async () => {
+    try {
+      const already = await hasDailyCheckInToday();
+      if (already) {
+        Alert.alert('Daily check-in done', 'Come back tomorrow for your next check-in.');
+        return;
+      }
+      await saveDailyCheckIn(energyRating, sleepHours);
+    } catch (e) {
+      if ((e as any)?.message === 'DAILY_CHECKIN_EXISTS') {
+        Alert.alert('Daily check-in done', 'Come back tomorrow for your next check-in.');
+      } else {
+        console.warn('Failed to submit check-in', e);
+      }
+    } finally {
+      closeModal();
+    }
+  };
+
   const modalContextValue = {
     isModalVisible,
     openModal,
@@ -85,17 +169,25 @@ export default function MainNavigator() {
   return (
     <ModalContext.Provider value={modalContextValue}>
       <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {!hasOnboarded ? (
-            <Stack.Screen name="Onboarding">
-              {(props) => (
-                <OnboardingScreen {...props} onDone={() => setHasOnboarded(true)} />
-              )}
-            </Stack.Screen>
-          ) : (
-            <Stack.Screen name="MainTabs" component={BottomTabNavigator} />
-          )}
-        </Stack.Navigator>
+        {!user ? (
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Login">{() => <LoginScreen onContinue={handleGoogleSignIn} />}</Stack.Screen>
+            <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+            <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+          </Stack.Navigator>
+        ) : (
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {!hasOnboarded ? (
+              <Stack.Screen name="Onboarding">
+                {(props) => (
+                  <OnboardingScreen {...props} onDone={() => setHasOnboarded(true)} />
+                )}
+              </Stack.Screen>
+            ) : (
+              <Stack.Screen name="MainTabs" component={BottomTabNavigator} />
+            )}
+          </Stack.Navigator>
+        )}
       </NavigationContainer>
 
       {/* Weekly Check-in Modal */}
@@ -235,7 +327,7 @@ export default function MainNavigator() {
                 {/* Header with X button */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13, marginTop: 6 }}>
                   <View style={{ flex: 1, alignItems: 'flex-start' }}>
-                    <Text style={{ fontSize: 25, fontWeight: 'bold', color: 'black' }}>Weekly Check-in</Text>
+                    <Text style={{ fontSize: 25, fontWeight: 'bold', color: 'black' }}>Daily Check-in</Text>
                   </View>
                   <TouchableOpacity 
                     onPress={closeModal}
@@ -341,7 +433,7 @@ export default function MainNavigator() {
                     alignItems: 'center',
                     marginTop: 'auto'
                   }}
-                  onPress={closeModal}
+                  onPress={submitCheckIn}
                 >
                   <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'black' }}>Done!</Text>
                 </TouchableOpacity>

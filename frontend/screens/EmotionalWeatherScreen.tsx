@@ -1,13 +1,13 @@
 import React from 'react';
 import { useState, useEffect} from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import {useForm, Controller} from 'react-hook-form';
 import { collection, getDocs, query, where, limit as fsLimit } from 'firebase/firestore';
 import { db, auth } from '../services/firebase';
 import PersistentHeader from '../components/PersistentHeader';
 import { SvgIcon } from '../components/SvgIcon';
 import { fetchTrelloData, TrelloData, getUrgencyColor } from '../services/trello-service';
-import { forecastService, BurnoutForecast } from '../services/forecast-service';
+import { forecastService, BurnoutForecast, buildLastNDates, getSleepDataForDateRange, calculateSleepDelta } from '../services/forecast-service';
 import { useFocusEffect } from '@react-navigation/native';
 
 
@@ -19,7 +19,11 @@ interface EmotionalWeatherData {
   forecast: string
 }
 
-export default function EmotionalWeatherScreen() {
+interface EmotionalWeatherScreenProps {
+  headerTitle?: string;
+}
+
+export default function EmotionalWeatherScreen({ headerTitle = "Emotional Weather" }: EmotionalWeatherScreenProps) {
   const {
     control,
     handleSubmit,
@@ -46,6 +50,7 @@ export default function EmotionalWeatherScreen() {
   const [sleepDeltaPct, setSleepDeltaPct] = useState<number | null>(null);
   const [sleepDirection, setSleepDirection] = useState<'up' | 'down' | 'even' | null>(null);
   const [forecastLoading, setForecastLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   
   const daysOfWeek = [
     { key: 'M', label: 'M' },
@@ -62,11 +67,39 @@ export default function EmotionalWeatherScreen() {
       setForecastLoading(true);
       const forecast = await forecastService.getLatestForecast();
       setLatestForecast(forecast);
-      console.log('[Forecast] Updated forecast:', forecast?.emotionalWeather?.label);
     } catch (err) {
       console.error('Error loading forecast:', err);
     } finally {
       setForecastLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const user = auth.currentUser;
+      const [data, forecast, sleepDataResult] = await Promise.all([
+        fetchTrelloData(),
+        forecastService.getLatestForecast(),
+        getSleepDataForDateRange(7)
+      ]);
+      setTrelloData(data);
+      setLatestForecast(forecast);
+      
+      if (sleepDataResult.sleepData.length > 0) {
+        const sleepDelta = calculateSleepDelta(sleepDataResult.sleepData);
+        setSleepDeltaPct(sleepDelta.deltaPct);
+        setSleepDirection(sleepDelta.direction);
+      } else {
+        setSleepDeltaPct(null);
+        setSleepDirection(null);
+      }
+      setError(null);
+    } catch (err) {
+      setError('Failed to refresh data');
+      console.error('Error refreshing data:', err);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -75,59 +108,22 @@ export default function EmotionalWeatherScreen() {
       try {
         setLoading(true);
         const user = auth.currentUser;
-        const [data, forecast, sleepSnap] = await Promise.all([
+        const [data, forecast, sleepDataResult] = await Promise.all([
           fetchTrelloData(),
           forecastService.getLatestForecast(),
-          user
-            ? getDocs(
-                query(
-                  collection(db, 'daily_checkins'),
-                  where('userId', '==', user.uid),
-                  fsLimit(50)
-                )
-              )
-            : Promise.resolve(null as any),
+          getSleepDataForDateRange(7) // Use 7 days for consistent data ranges
         ]);
         setTrelloData(data);
         setLatestForecast(forecast);
-        if (sleepSnap) {
-          // Build keys for today and previous 7 days
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const keys: string[] = [];
-          for (let i = 0; i <= 7; i++) {
-            const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
-            const y = d.getFullYear();
-            const m = `${d.getMonth() + 1}`.padStart(2, '0');
-            const dd = `${d.getDate()}`.padStart(2, '0');
-            keys.push(`${y}-${m}-${dd}`);
-          }
-          const todayKey = keys[0];
-          const baselineKeys = keys.slice(1); // previous 7 days
-          const byKey: Record<string, number> = {};
-          sleepSnap.forEach((docSnap: any) => {
-            const d = docSnap.data();
-            const key = d.dateKey as string | undefined;
-            const hours = Number(d.sleepHours) || 0;
-            if (key) byKey[key] = hours;
-          });
-          const todayHours = byKey[todayKey];
-          const baselineValues = baselineKeys.map((k) => Number(byKey[k]) || 0).filter((v) => v > 0);
-          if (todayHours > 0 && baselineValues.length > 0) {
-            const avg = baselineValues.reduce((s, v) => s + v, 0) / baselineValues.length;
-            if (avg > 0) {
-              const diff = todayHours - avg;
-              const pct = Math.round((Math.abs(diff) / avg) * 100);
-              setSleepDeltaPct(pct);
-              setSleepDirection(diff >= 0 ? (diff === 0 ? 'even' : 'up') : 'down');
-            } else {
-              setSleepDeltaPct(null);
-              setSleepDirection(null);
-            }
-          } else {
-            setSleepDeltaPct(null);
-            setSleepDirection(null);
-          }
+        
+        if (sleepDataResult.sleepData.length > 0) {
+          // Use unified sleep delta calculation
+          const sleepDelta = calculateSleepDelta(sleepDataResult.sleepData);
+          setSleepDeltaPct(sleepDelta.deltaPct);
+          setSleepDirection(sleepDelta.direction);
+        } else {
+          setSleepDeltaPct(null);
+          setSleepDirection(null);
         }
         setError(null);
       } catch (err) {
@@ -140,10 +136,39 @@ export default function EmotionalWeatherScreen() {
     load();
   }, []);
 
-  // Refresh forecast when screen comes into focus
+  // Refresh all data when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      loadForecast();
+      const refreshAllData = async () => {
+        try {
+          setLoading(true);
+          const user = auth.currentUser;
+          const [data, forecast, sleepDataResult] = await Promise.all([
+            fetchTrelloData(),
+            forecastService.getLatestForecast(),
+            getSleepDataForDateRange(7) // Use 7 days for consistent data ranges
+          ]);
+          setTrelloData(data);
+          setLatestForecast(forecast);
+          
+          if (sleepDataResult.sleepData.length > 0) {
+            // Use unified sleep delta calculation
+            const sleepDelta = calculateSleepDelta(sleepDataResult.sleepData);
+            setSleepDeltaPct(sleepDelta.deltaPct);
+            setSleepDirection(sleepDelta.direction);
+          } else {
+            setSleepDeltaPct(null);
+            setSleepDirection(null);
+          }
+          setError(null);
+        } catch (err) {
+          setError('Failed to refresh data');
+          console.error('Error refreshing data:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      refreshAllData();
     }, [])
   );
 
@@ -184,8 +209,12 @@ export default function EmotionalWeatherScreen() {
 
   return (
     <View className = "flex-1 bg-[#F8F8F8]">
-      <PersistentHeader />
-      <ScrollView>
+      <PersistentHeader title={headerTitle} />
+      <ScrollView
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         <View className = "bg-[#E5E5E5] mx-4 mt-4 rounded-2xl border-2 border-black shadow flex-row min-h-[130px]">
           <View className = "flex-1 p-4 justify-center">
             <Text className = "text-m text-black text-left mb-1">{new Date().toLocaleDateString()}</Text>

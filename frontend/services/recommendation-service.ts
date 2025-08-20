@@ -1,87 +1,44 @@
+import { auth, db } from './firebase';
 import { collection, getDocs, query, where, limit as fsLimit } from 'firebase/firestore';
-import { db, auth } from './firebase';
-import { forecastService } from './forecast-service';
+import { forecastService, getSleepDataForDateRange, calculateSleepDelta } from './forecast-service';
 
-export type MirrorRecommendation = {
+export interface MirrorRecommendation {
   text: string;
   category: 'immediate' | 'short-term' | 'long-term';
   priority: 'high' | 'medium' | 'low';
-};
+}
 
 type Trend = 'up' | 'down' | 'even' | 'unknown';
-
-function computePercentDelta(today: number, baselineValues: number[]): { pct: number | null; dir: Trend } {
-  const valid = baselineValues.filter((v) => v > 0);
-  if (today <= 0 || valid.length === 0) return { pct: null, dir: 'unknown' };
-  const avg = valid.reduce((s, v) => s + v, 0) / valid.length;
-  if (avg <= 0) return { pct: null, dir: 'unknown' };
-  const diff = today - avg;
-  const pct = Math.round((Math.abs(diff) / avg) * 100);
-  return { pct, dir: diff === 0 ? 'even' : diff > 0 ? 'up' : 'down' };
-}
-
-function buildDateKeys(n: number): string[] {
-  const out: string[] = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  for (let i = 0; i < n; i++) {
-    const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
-    const y = d.getFullYear();
-    const m = `${d.getMonth() + 1}`.padStart(2, '0');
-    const dd = `${d.getDate()}`.padStart(2, '0');
-    out.push(`${y}-${m}-${dd}`);
-  }
-  return out;
-}
 
 export async function generateMirrorRecommendations(): Promise<MirrorRecommendation[]> {
   const user = auth.currentUser;
   if (!user) return [];
 
-  // Fetch latest forecast and last ~50 daily docs
-  const [forecast, dcSnap, mdSnap] = await Promise.all([
+  // Fetch latest forecast and sleep data using unified functions
+  const [forecast, sleepDataResult] = await Promise.all([
     forecastService.getLatestForecast(),
-    getDocs(query(collection(db, 'daily_checkins'), where('userId', '==', user.uid), fsLimit(50))),
-    getDocs(query(collection(db, 'meetings_daily'), where('userId', '==', user.uid), fsLimit(50))),
+    getSleepDataForDateRange(7), // Use 7 days for consistency
   ]);
 
-  const keys = buildDateKeys(8); // today + last 7
-  const todayKey = keys[0];
-  const baselineKeys = keys.slice(1);
-
-  const byKeySleep: Record<string, number> = {};
-  dcSnap.forEach((doc) => {
-    const d = doc.data() as any;
-    const key = d.dateKey as string | undefined;
-    if (key) byKeySleep[key] = Number(d.sleepHours) || 0;
-  });
-  const todaySleep = byKeySleep[todayKey] || 0;
-  const baselineSleep = baselineKeys.map((k) => byKeySleep[k] || 0);
-  const sleepDelta = computePercentDelta(todaySleep, baselineSleep);
-
-  const byKeyMeet: Record<string, number> = {};
-  mdSnap.forEach((doc) => {
-    const d = doc.data() as any;
-    const key = (d.dateKey as string) || '';
-    if (key) byKeyMeet[key] = Number(d.count ?? d.meetings) || 0;
-  });
-  const todayMeet = byKeyMeet[todayKey] || 0;
-  const baselineMeet = baselineKeys.map((k) => byKeyMeet[k] || 0);
-  const meetDelta = computePercentDelta(todayMeet, baselineMeet);
+  // Use the unified sleep delta calculation
+  const sleepDelta = calculateSleepDelta(sleepDataResult.sleepData);
+  
+  // Calculate meetings delta using the same logic
+  const meetingsDelta = calculateMeetingsDelta(sleepDataResult.meetingsData);
 
   const recs: MirrorRecommendation[] = [];
 
   // Sleep-focused recs
-  if (sleepDelta.pct !== null) {
-    if (sleepDelta.dir === 'down' && sleepDelta.pct >= 10) {
+  if (sleepDelta.deltaPct !== null) {
+    if (sleepDelta.direction === 'down' && sleepDelta.deltaPct >= 10) {
       recs.push({
-        text: `Sleep is down ${sleepDelta.pct}% vs usual. Schedule a 20–30 minute recovery block and target an earlier wind-down tonight.`,
+        text: `Sleep is down ${sleepDelta.deltaPct}% vs usual. Schedule a 20–30 minute recovery block and target an earlier wind-down tonight.`,
         category: 'immediate',
         priority: 'high',
       });
-    } else if (sleepDelta.dir === 'up' && sleepDelta.pct >= 10) {
+    } else if (sleepDelta.direction === 'up' && sleepDelta.deltaPct >= 10) {
       recs.push({
-        text: `Great sleep (+${sleepDelta.pct}%). Protect this pattern by keeping your sleep window consistent.`,
+        text: `Great sleep (+${sleepDelta.deltaPct}%). Protect this pattern by keeping your sleep window consistent.`,
         category: 'short-term',
         priority: 'medium',
       });
@@ -89,16 +46,16 @@ export async function generateMirrorRecommendations(): Promise<MirrorRecommendat
   }
 
   // Meetings-focused recs
-  if (meetDelta.pct !== null) {
-    if (meetDelta.dir === 'up' && meetDelta.pct >= 20) {
+  if (meetingsDelta.deltaPct !== null) {
+    if (meetingsDelta.direction === 'up' && meetingsDelta.deltaPct >= 20) {
       recs.push({
-        text: `Meetings up ${meetDelta.pct}% vs usual. Decline low-priority invites and block 60–90 minutes of focus time.`,
+        text: `Meetings up ${meetingsDelta.deltaPct}% vs usual. Decline low-priority invites and block 60–90 minutes of focus time.`,
         category: 'immediate',
         priority: 'high',
       });
-    } else if (meetDelta.dir === 'down' && meetDelta.pct >= 20) {
+    } else if (meetingsDelta.direction === 'down' && meetingsDelta.deltaPct >= 20) {
       recs.push({
-        text: `Fewer meetings (−${meetDelta.pct}%). Use this window to make progress on a deep-work task.`,
+        text: `Fewer meetings (−${meetingsDelta.deltaPct}%). Use this window to make progress on a deep-work task.`,
         category: 'short-term',
         priority: 'medium',
       });
@@ -131,13 +88,69 @@ export async function generateMirrorRecommendations(): Promise<MirrorRecommendat
   // Ensure at least 3 suggestions
   while (recs.length < 3) {
     recs.push({
-      text: 'Take a 5-minute breath or stretch break between tasks to reset attention.',
-      category: 'short-term',
+      text: 'Consider taking a 5-minute break to stretch and reset your focus.',
+      category: 'immediate',
       priority: 'low',
     });
   }
 
-  return recs.slice(0, 5);
+  return recs.slice(0, 3);
+}
+
+// Helper function to calculate meetings delta using the same logic as sleep delta
+function calculateMeetingsDelta(meetingsData: { day: string; meetings: number }[]): {
+  deltaPct: number | null;
+  direction: 'up' | 'down' | 'even' | null;
+  todayMeetings: number;
+  averageMeetings: number;
+} {
+  if (!meetingsData || meetingsData.length === 0) {
+    return { deltaPct: null, direction: null, todayMeetings: 0, averageMeetings: 0 };
+  }
+
+  // Get today's day of week (0 = Sunday, 1 = Monday, etc.)
+  const today = new Date();
+  const todayDayOfWeek = today.getDay(); // 0-6
+  
+  // Map day of week to our fixed labels
+  const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const todayLabel = dayLabels[todayDayOfWeek];
+  
+  // Find today's data in the array
+  const todayData = meetingsData.find(d => d.day === todayLabel);
+  const todayMeetings = todayData?.meetings || 0;
+
+  // Get baseline data (all days except today with valid meetings data)
+  const baselineData = meetingsData
+    .filter(d => d.day !== todayLabel && d.meetings > 0); // Exclude today and days with no data
+
+  if (baselineData.length === 0 || todayMeetings === 0) {
+    return { deltaPct: null, direction: null, todayMeetings, averageMeetings: 0 };
+  }
+
+  // Calculate average baseline meetings
+  const totalBaselineMeetings = baselineData.reduce((sum, d) => sum + d.meetings, 0);
+  const averageMeetings = totalBaselineMeetings / baselineData.length;
+
+  if (averageMeetings === 0) {
+    return { deltaPct: null, direction: null, todayMeetings, averageMeetings: 0 };
+  }
+
+  // Calculate delta
+  const diff = todayMeetings - averageMeetings;
+  const deltaPct = Math.round((Math.abs(diff) / averageMeetings) * 100);
+  
+  // Determine direction
+  let direction: 'up' | 'down' | 'even';
+  if (diff > 0) {
+    direction = 'up';
+  } else if (diff < 0) {
+    direction = 'down';
+  } else {
+    direction = 'even';
+  }
+
+  return { deltaPct, direction, todayMeetings, averageMeetings };
 }
 
 

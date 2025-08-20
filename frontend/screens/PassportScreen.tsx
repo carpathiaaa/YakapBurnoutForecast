@@ -6,6 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../services/firebase';
 import PersistentHeader from '../components/PersistentHeader';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface PassportFormData {
   profileImage: string | null;
@@ -19,7 +20,11 @@ interface PassportFormData {
   recoveryStrategies: string[];
 }
 
-export default function PassportScreen() {
+interface PassportScreenProps {
+  headerTitle?: string;
+}
+
+export default function PassportScreen({ headerTitle = "My Wellness Passport" }: PassportScreenProps) {
   // Basic fallback display values (will be overridden by Firestore data)
   const user = {
     email: auth.currentUser?.email ?? 'user@example.com',
@@ -113,6 +118,13 @@ export default function PassportScreen() {
   useEffect(() => {
     loadUserPassport();
   }, []);
+
+  // Refresh passport data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadUserPassport();
+    }, [])
+  );
 
   const loadUserPassport = async () => {
     try {
@@ -320,7 +332,7 @@ export default function PassportScreen() {
 
   return (
     <View className="flex-1 bg-[#F8F8F8]">
-      <PersistentHeader />
+      <PersistentHeader title={headerTitle} />
       <ScrollView>
         {/* SECTION: Passport Card */}
         <View className="bg-white mx-4 mt-4 rounded-2xl border-2 border-black shadow flex-row min-h-[180px]">

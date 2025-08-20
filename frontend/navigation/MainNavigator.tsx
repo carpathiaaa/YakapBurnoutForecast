@@ -6,15 +6,15 @@ import { Modal, Pressable, View, Text, TouchableOpacity, PanResponder, Animated,
 import { onAuthStateChanged, signInWithCredential, GoogleAuthProvider, User } from 'firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
-
 import BottomTabNavigator from './BottomTabNavigator';
 import LoginScreen from '../screens/LoginScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import OnboardingScreen from '../features/onboarding/OnboardingScreen';
+import { SvgIcon } from '../components/SvgIcon';
 import { auth } from '../services/firebase';
 // Using react-native-google-signin instead of Expo Auth Session
-import { forecastService, saveDailyCheckIn, hasDailyCheckInToday, seedDummyDailyData } from '../services/forecast-service';
+import { forecastService, saveDailyCheckIn, hasDailyCheckInToday, seedDummyDailyData, generateTestForecast } from '../services/forecast-service';
 import Constants from 'expo-constants';
 
 // Expo WebBrowser not needed with react-native-google-signin
@@ -39,7 +39,7 @@ export const useModal = () => {
 };
 
 export default function MainNavigator() {
-  const [hasOnboarded, setHasOnboarded] = useState(false);
+  const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null); // null = loading, false = needs onboarding, true = completed
   const [user, setUser] = useState<User | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [hasSeededDemoData, setHasSeededDemoData] = useState(false);
@@ -61,11 +61,42 @@ export default function MainNavigator() {
     return () => unsub();
   }, []);
 
+  // Check user profile to determine onboarding status
+  useEffect(() => {
+    const checkUserProfile = async () => {
+      if (!user) {
+        setHasOnboarded(null);
+        return;
+      }
+
+      try {
+        console.log('[Onboarding] Checking profile for user:', user.uid);
+        const profile = await forecastService.getUserProfile();
+        
+        if (profile && profile.profile && Object.keys(profile.profile).length > 0) {
+          // User has a profile with data, consider them onboarded
+          console.log('[Onboarding] User has profile, skipping onboarding');
+          setHasOnboarded(true);
+        } else {
+          // User exists but has no profile data, needs onboarding
+          console.log('[Onboarding] User has no profile, showing onboarding');
+          setHasOnboarded(false);
+        }
+      } catch (error) {
+        console.warn('[Onboarding] Error checking user profile:', error);
+        // If there's an error, assume user needs onboarding
+        setHasOnboarded(false);
+      }
+    };
+
+    checkUserProfile();
+  }, [user]);
+
   // TEMP: Seed demo data once after login (remove when not needed)
   useEffect(() => {
     const runSeed = async () => {
       try {
-        if (user && !hasSeededDemoData) {
+        if (user && !hasSeededDemoData && hasOnboarded === true) {
           await seedDummyDailyData(50);
           setHasSeededDemoData(true);
           console.log('[Seed] Demo data seeded for user');
@@ -75,7 +106,7 @@ export default function MainNavigator() {
       }
     };
     runSeed();
-  }, [user, hasSeededDemoData]);
+  }, [user, hasSeededDemoData, hasOnboarded]);
 
   const handleGoogleSignIn = async () => {
     try {
@@ -113,8 +144,6 @@ export default function MainNavigator() {
     sliderPosition.setValue((7 / 12) * 260);
   };
 
-
-
   // PanResponder for custom slider
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
@@ -149,6 +178,15 @@ export default function MainNavigator() {
         return;
       }
       await saveDailyCheckIn(energyRating, sleepHours);
+      
+      // Generate new forecast after check-in
+      try {
+        await generateTestForecast();
+        console.log('[CheckIn] Forecast generated successfully');
+      } catch (forecastError) {
+        console.warn('[CheckIn] Failed to generate forecast:', forecastError);
+        // Don't fail the check-in if forecast generation fails
+      }
     } catch (e) {
       if ((e as any)?.message === 'DAILY_CHECKIN_EXISTS') {
         Alert.alert('Daily check-in done', 'Come back tomorrow for your next check-in.');
@@ -165,6 +203,15 @@ export default function MainNavigator() {
     openModal,
     closeModal,
   };
+
+  // Show loading while checking user profile
+  if (user && hasOnboarded === null) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <ModalContext.Provider value={modalContextValue}>
@@ -223,11 +270,11 @@ export default function MainNavigator() {
               maxWidth: '90%',
             }}
           >
-                         {/* Header with X button */}
-             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13, marginTop: 6 }}>
-               <View style={{ flex: 1, alignItems: 'flex-start' }}>
-                 <Text style={{ fontSize: 25, fontWeight: 'bold', color: 'black' }}>Daily Check-in</Text>
-               </View>
+            {/* Header with X button */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13, marginTop: 6 }}>
+              <View style={{ flex: 1, alignItems: 'flex-start' }}>
+                <Text style={{ fontSize: 25, fontWeight: 'bold', color: 'black' }}>Daily Check-in</Text>
+              </View>
               <TouchableOpacity 
                 onPress={closeModal}
                 style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}
@@ -238,39 +285,191 @@ export default function MainNavigator() {
 
             <View className="mt-2 mx-1 h-0.5 bg-black mb-2" />
 
-                         {/* Energy Level Question */}
-             <View style={{ marginBottom: 20 }}>
-               <Text style={{ fontSize: 16, color: 'black', textAlign: 'left', lineHeight: 22 }}>
-                 How would you rate your <Text style={{ fontWeight: 'bold' }}>energy level</Text> today?
-               </Text>
-             </View>
+            {/* Energy Level Question */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={{ fontSize: 16, color: 'black', textAlign: 'left', lineHeight: 22 }}>
+                How would you rate your <Text style={{ fontWeight: 'bold' }}>energy level</Text> today?
+              </Text>
+            </View>
 
-             {/* Energy Level Rating */}
-             <View style={{ marginBottom: 30 }}>
-               {/* Rating Labels */}
-               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-                 <Text style={{ fontSize: 15, fontWeight: 'bold', color: 'black' }}>1 - Drained</Text>
-                 <Text style={{ fontSize: 15, fontWeight: 'bold', color: 'black' }}>5 - High energy</Text>
-               </View>
-               
-                               {/* Star Rating */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  {[1, 2, 3, 4, 5].map((rating) => (
-                    <TouchableOpacity 
-                      key={rating} 
-                      style={{ alignItems: 'center' }}
-                      onPress={() => setEnergyRating(rating)}
-                    >
-                      <Text style={{ fontSize: 20, color: 'black', marginBottom: 2 }}>{rating}</Text>
-                      <Text style={{ fontSize: 50, color: rating <= energyRating ? '#FFD700' : '#E5E5E5' }}>
-                        {rating <= energyRating ? '★' : '☆'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+            {/* Energy Level Rating */}
+            <View style={{ marginBottom: 30 }}>
+              {/* Rating Labels */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                <Text style={{ fontSize: 15, fontWeight: 'bold', color: 'black' }}>1 - Drained</Text>
+                <Text style={{ fontSize: 15, fontWeight: 'bold', color: 'black' }}>5 - High energy</Text>
+              </View>
+              
+              {/* Star Rating */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <TouchableOpacity 
+                    key={rating} 
+                    style={{ alignItems: 'center' }}
+                    onPress={() => setEnergyRating(rating)}
+                  >
+                    <Text style={{ fontSize: 20, color: 'black', marginBottom: 2 }}>{rating}</Text>
+                                         <SvgIcon 
+                       name={rating <= energyRating ? 'star' : 'star-empty'} 
+                       size={50} 
+                     />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Continue Button */}
+            <TouchableOpacity 
+              style={{
+                backgroundColor: 'white',
+                borderWidth: 2,
+                borderColor: 'black',
+                borderRadius: 12,
+                paddingVertical: 12,
+                paddingHorizontal: 20,
+                alignItems: 'center',
+                marginTop: -20
+              }}
+              onPress={() => setModalStep(2)}
+            >
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'black' }}>→ Continue</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Sleep Duration Modal Step */}
+      {modalStep === 2 && (
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={isModalVisible}
+          onRequestClose={closeModal}
+          statusBarTranslucent={true}
+        >
+          {/* Backdrop with darkened background */}
+          <Pressable 
+            onPress={closeModal}
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0, 0, 0, 0.4)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            {/* Modal content */}
+            <Pressable 
+              onPress={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: 'white',
+                borderRadius: 24,
+                borderWidth: 2,
+                borderColor: 'black',
+                padding: 24,
+                marginHorizontal: 16,
+                width: 320,
+                height: 370,
+                maxWidth: '90%',
+              }}
+            >
+              {/* Header with X button */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13, marginTop: 6 }}>
+                <View style={{ flex: 1, alignItems: 'flex-start' }}>
+                  <Text style={{ fontSize: 25, fontWeight: 'bold', color: 'black' }}>Daily Check-in</Text>
                 </View>
-             </View>
+                <TouchableOpacity 
+                  onPress={closeModal}
+                  style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ fontSize: 24, color: '#666' }}>×</Text>
+                </TouchableOpacity>
+              </View>
 
-                           {/* Continue Button */}
+              <View className="mt-2 mx-1 h-0.5 bg-black mb-2" />
+
+              {/* Sleep Question */}
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 16, color: 'black', textAlign: 'left', lineHeight: 22 }}>
+                  How many <Text style={{ fontWeight: 'bold' }}>hours of sleep</Text> did you get tonight?
+                </Text>
+              </View>
+
+              {/* Sleep Hours Display */}
+              <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                <Text style={{ fontSize: 24, fontWeight: 'bold', color: 'black' }}>
+                  {sleepHours} Hour{sleepHours !== 1 ? 's' : ''}
+                </Text>
+              </View>
+
+              {/* Custom Slider */}
+              <View style={{ marginBottom: 30 }}>
+                <View style={{
+                  height: 12,
+                  backgroundColor: 'white',
+                  borderWidth: 1,
+                  borderColor: 'black',
+                  borderRadius: 6,
+                  position: 'relative',
+                  marginHorizontal: 10
+                }}>
+                  <Animated.View
+                    {...panResponder.panHandlers}
+                    style={{
+                      position: 'absolute',
+                      left: sliderPosition.interpolate({
+                        inputRange: [0, 260],
+                        outputRange: [0, 260],
+                        extrapolate: 'clamp'
+                      }),
+                      top: -4,
+                      width: 20,
+                      height: 20,
+                      backgroundColor: '#D3D3D3',
+                      borderWidth: 1,
+                      borderColor: 'black',
+                      borderRadius: 10,
+                      marginLeft: -10,
+                      transform: [{ scale: isDragging ? 1.1 : 1 }],
+                      zIndex: 10
+                    }}
+                  />
+                </View>
+                
+                {/* Tap to position overlay */}
+                <Pressable
+                  style={{
+                    position: 'absolute',
+                    top: -4,
+                    left: 10,
+                    right: 10,
+                    height: 20,
+                    zIndex: 1
+                  }}
+                  onPress={(event) => {
+                    const { locationX } = event.nativeEvent;
+                    const sliderWidth = 280;
+                    const handleWidth = 20;
+                    const maxPosition = sliderWidth - handleWidth;
+                    // Calculate percentage based on track width
+                    const percentage = Math.max(0, Math.min(1, locationX / sliderWidth));
+                    const newHours = Math.round(percentage * 12);
+                    // Strict boundary enforcement for tap
+                    const clampedPosition = Math.max(0, Math.min(maxPosition, percentage * maxPosition));
+                    setSleepHours(newHours);
+                    sliderPosition.setValue(clampedPosition);
+                  }}
+                />
+                
+              </View>
+
+              {/* Instruction */}
+              <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
+                  Slide to Adjust
+                </Text>
+              </View>
+
+              {/* Done Button */}
               <TouchableOpacity 
                 style={{
                   backgroundColor: 'white',
@@ -280,167 +479,16 @@ export default function MainNavigator() {
                   paddingVertical: 12,
                   paddingHorizontal: 20,
                   alignItems: 'center',
-                  marginTop: -20
+                  marginTop: 'auto'
                 }}
-                onPress={() => setModalStep(2)}
+                onPress={submitCheckIn}
               >
-                <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'black' }}>→ Continue</Text>
-                            </TouchableOpacity>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'black' }}>Done!</Text>
+              </TouchableOpacity>
             </Pressable>
           </Pressable>
         </Modal>
-
-        {/* Sleep Duration Modal Step */}
-        {modalStep === 2 && (
-          <Modal
-            animationType="fade"
-            transparent={true}
-            visible={isModalVisible}
-            onRequestClose={closeModal}
-            statusBarTranslucent={true}
-          >
-            {/* Backdrop with darkened background */}
-            <Pressable 
-              onPress={closeModal}
-              style={{
-                flex: 1,
-                backgroundColor: 'rgba(0, 0, 0, 0.4)',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              {/* Modal content */}
-              <Pressable 
-                onPress={(e) => e.stopPropagation()}
-                style={{
-                  backgroundColor: 'white',
-                  borderRadius: 24,
-                  borderWidth: 2,
-                  borderColor: 'black',
-                  padding: 24,
-                  marginHorizontal: 16,
-                  width: 320,
-                  height: 370,
-                  maxWidth: '90%',
-                }}
-              >
-                {/* Header with X button */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13, marginTop: 6 }}>
-                  <View style={{ flex: 1, alignItems: 'flex-start' }}>
-                    <Text style={{ fontSize: 25, fontWeight: 'bold', color: 'black' }}>Daily Check-in</Text>
-                  </View>
-                  <TouchableOpacity 
-                    onPress={closeModal}
-                    style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <Text style={{ fontSize: 24, color: '#666' }}>×</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View className="mt-2 mx-1 h-0.5 bg-black mb-2" />
-
-                {/* Sleep Question */}
-                <View style={{ marginBottom: 20 }}>
-                  <Text style={{ fontSize: 16, color: 'black', textAlign: 'left', lineHeight: 22 }}>
-                    How many <Text style={{ fontWeight: 'bold' }}>hours of sleep</Text> did you get tonight?
-                  </Text>
-                </View>
-
-                {/* Sleep Hours Display */}
-                <View style={{ alignItems: 'center', marginBottom: 20 }}>
-                  <Text style={{ fontSize: 24, fontWeight: 'bold', color: 'black' }}>
-                    {sleepHours} Hour{sleepHours !== 1 ? 's' : ''}
-                  </Text>
-                </View>
-
-                                 {/* Custom Slider */}
-                 <View style={{ marginBottom: 30 }}>
-                                       <View style={{
-                      height: 12,
-                      backgroundColor: 'white',
-                      borderWidth: 1,
-                      borderColor: 'black',
-                      borderRadius: 6,
-                      position: 'relative',
-                      marginHorizontal: 10
-                    }}>
-                                             <Animated.View
-                         {...panResponder.panHandlers}
-                         style={{
-                           position: 'absolute',
-                           left: sliderPosition.interpolate({
-                             inputRange: [0, 260],
-                             outputRange: [0, 260],
-                             extrapolate: 'clamp'
-                           }),
-                           top: -4,
-                           width: 20,
-                           height: 20,
-                           backgroundColor: '#D3D3D3',
-                           borderWidth: 1,
-                           borderColor: 'black',
-                           borderRadius: 10,
-                           marginLeft: -10,
-                           transform: [{ scale: isDragging ? 1.1 : 1 }],
-                           zIndex: 10
-                         }}
-                       />
-                    </View>
-                   
-                   {/* Tap to position overlay */}
-                   <Pressable
-                     style={{
-                       position: 'absolute',
-                       top: -4,
-                       left: 10,
-                       right: 10,
-                       height: 20,
-                       zIndex: 1
-                     }}
-                                           onPress={(event) => {
-                        const { locationX } = event.nativeEvent;
-                        const sliderWidth = 280;
-                        const handleWidth = 20;
-                        const maxPosition = sliderWidth - handleWidth;
-                        // Calculate percentage based on track width
-                        const percentage = Math.max(0, Math.min(1, locationX / sliderWidth));
-                        const newHours = Math.round(percentage * 12);
-                        // Strict boundary enforcement for tap
-                        const clampedPosition = Math.max(0, Math.min(maxPosition, percentage * maxPosition));
-                        setSleepHours(newHours);
-                        sliderPosition.setValue(clampedPosition);
-                      }}
-                   />
-                   
-                 </View>
-
-                {/* Instruction */}
-                <View style={{ alignItems: 'center', marginBottom: 20 }}>
-                  <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
-                    Slide to Adjust
-                  </Text>
-                </View>
-
-                {/* Done Button */}
-                <TouchableOpacity 
-                  style={{
-                    backgroundColor: 'white',
-                    borderWidth: 2,
-                    borderColor: 'black',
-                    borderRadius: 12,
-                    paddingVertical: 12,
-                    paddingHorizontal: 20,
-                    alignItems: 'center',
-                    marginTop: 'auto'
-                  }}
-                  onPress={submitCheckIn}
-                >
-                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'black' }}>Done!</Text>
-                </TouchableOpacity>
-              </Pressable>
-            </Pressable>
-          </Modal>
-        )}
-      </ModalContext.Provider>
-    );
-  }
+      )}
+    </ModalContext.Provider>
+  );
+}

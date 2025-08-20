@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, FlatList, Dimensions, Button, StyleSheet, Text } from 'react-native';
+import { View, FlatList, Dimensions, TouchableOpacity, StyleSheet, Text } from 'react-native';
 import { onboardingSteps } from './data/onboardingSteps';
 import OnboardingStep from './components/OnboardingStep';
 import { forecastService } from '../../services/forecast-service';
@@ -171,9 +171,15 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onDone }) => {
           </View>
         </View>
         <View style={styles.passportButtonRow}>
-          <View style={styles.buttonWrapper}>
-            <Button title={index === onboardingSteps.length - 1 ? 'Finish' : '→ Next'} onPress={handleNext} />
-          </View>
+          <TouchableOpacity 
+            style={styles.nextButton}
+            onPress={handleNext}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.nextButtonText}>
+              {index === onboardingSteps.length - 1 ? 'Finish' : '→ Next'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -209,7 +215,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onDone }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F8F8F8', // Match app's background color
   },
   indicatorContainer: {
     flexDirection: 'row',
@@ -225,10 +231,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   activeIndicator: {
-    backgroundColor: '#007BFF',
+    backgroundColor: '#000', // Match app's black theme
   },
   inactiveIndicator: {
-    backgroundColor: '#D3D3D3',
+    backgroundColor: '#E5E5E5', // Match app's gray theme
   },
   pageContainer: {
     width: SCREEN_WIDTH,
@@ -259,16 +265,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginTop: 20,
     textAlign: 'center',
+    color: '#333',
   },
   passportSubtitle: {
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
     marginTop: 5,
+    color: '#000',
   },
   passportHelper: {
     fontSize: 12,
-    color: '#555',
+    color: '#666',
     textAlign: 'center',
     marginTop: 6,
     marginBottom: 20,
@@ -283,13 +291,13 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#ccc',
+    backgroundColor: '#E5E5E5', // Match app's gray
     marginHorizontal: 4,
     borderWidth: 2,
     borderColor: '#fff',
   },
   passportDotActive: {
-    backgroundColor: '#007BFF',
+    backgroundColor: '#000', // Match app's black theme
   },
   profileUploadSection: {
     flex: 1,
@@ -299,18 +307,29 @@ const styles = StyleSheet.create({
   },
   passportButtonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'center',
     paddingHorizontal: 40,
     paddingBottom: 40,
-    gap: 20,
   },
-  buttonWrapper: {
-    flex: 1,
+  nextButton: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#000',
+    borderRadius: 24, // Match app's rounded style
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    minWidth: 120,
+  },
+  nextButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   passportHeaderHalfCircle: {
     width: '100%',
     height: 300,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#E5E5E5', // Match app's gray theme
     borderBottomLeftRadius: 600,
     borderBottomRightRadius: 600,
     alignItems: 'center',

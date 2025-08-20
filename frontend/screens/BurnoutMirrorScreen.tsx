@@ -220,7 +220,7 @@ export default function BurnoutMirrorScreen() {
                         )}
                         <TouchableOpacity
                           onPress={() => handleBarPress(data.day, data.hours)}
-                          className={`bg-gray-200 border-2 border-black w-8 mb-1 ${selectedDay === data.day ? 'bg-blue-200' : ''}`}
+                          className={`bg-gray-200 border-2 border-black w-8 mb-1 ${selectedDay === data.day ? 'bg-gray-400' : ''}`}
                           style={{ height: barHeight(data.hours, sleepData, 140) }}
                           activeOpacity={0.7}
                         />
@@ -260,7 +260,7 @@ export default function BurnoutMirrorScreen() {
                         )}
                         <TouchableOpacity
                           onPress={() => handleMeetingBarPress(data.day, data.meetings)}
-                          className={`bg-gray-200 border-2 border-black w-8 mb-1 ${selectedMeetingDay === data.day ? 'bg-blue-200' : ''}`}
+                          className={`bg-gray-200 border-2 border-black w-8 mb-1 ${selectedMeetingDay === data.day ? 'bg-gray-400' : ''}`}
                           style={{ height: barHeight(data.meetings, meetingsData, 140) }}
                           activeOpacity={0.7}
                         />

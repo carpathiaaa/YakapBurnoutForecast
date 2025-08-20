@@ -351,12 +351,12 @@ class BurnoutForecastEngine {
     generateEmotionalWeather(score, trend) {
         const weatherPatterns = {
             // Positive weather patterns
-            'sunny': { label: 'Sunny with clear skies', intensity: 'calm', icon: '☀️' },
-            'partly-cloudy': { label: 'Partly cloudy with gentle breeze', intensity: 'mild', icon: '⛅' },
-            'cloudy': { label: 'Cloudy with scattered thoughts', intensity: 'moderate', icon: '☁️' },
-            'overcast': { label: 'Overcast with rising tension', intensity: 'stormy', icon: '🌥️' },
-            'stormy': { label: 'Stormy with emotional turbulence', intensity: 'stormy', icon: '⛈️' },
-            'critical': { label: 'Hurricane conditions - immediate shelter needed', intensity: 'critical', icon: '🌀' }
+            'sunny': { label: 'Sunny with clear skies', intensity: 'calm', icon: 'sun' },
+            'partly-cloudy': { label: 'Partly cloudy with gentle breeze', intensity: 'mild', icon: 'partly-cloudy' },
+            'cloudy': { label: 'Cloudy with scattered thoughts', intensity: 'moderate', icon: 'cloudy' },
+            'overcast': { label: 'Overcast with rising tension', intensity: 'stormy', icon: 'overcast' },
+            'stormy': { label: 'Stormy with emotional turbulence', intensity: 'stormy', icon: 'stormy' },
+            'critical': { label: 'Hurricane conditions - immediate shelter needed', intensity: 'critical', icon: 'critical' }
         };
         // Determine base weather based on score
         let baseWeather;

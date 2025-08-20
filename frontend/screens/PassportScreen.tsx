@@ -377,7 +377,7 @@ export default function PassportScreen() {
                            <TouchableOpacity
                              key={dept}
                              className={`py-2 px-3 border-b border-gray-100 ${
-                               watchedValues.department === dept ? 'bg-purple-100' : ''
+                               watchedValues.department === dept ? 'bg-gray-200' : ''
                              }`}
                              onPress={() => {
                                setValue('department', dept, { shouldValidate: true });
@@ -385,7 +385,7 @@ export default function PassportScreen() {
                              }}
                            >
                              <Text className={`text-sm ${
-                               watchedValues.department === dept ? 'font-bold text-purple-600' : 'text-black'
+                               watchedValues.department === dept ? 'font-bold text-black' : 'text-black'
                              }`}>
                                {dept}
                              </Text>
@@ -427,7 +427,7 @@ export default function PassportScreen() {
                            <TouchableOpacity
                              key={time}
                              className={`py-2 px-3 border-b border-gray-100 ${
-                               watchedValues.productiveTime === time ? 'bg-blue-100' : ''
+                               watchedValues.productiveTime === time ? 'bg-gray-200' : ''
                              }`}
                              onPress={() => {
                                setValue('productiveTime', time, { shouldValidate: true });
@@ -435,7 +435,7 @@ export default function PassportScreen() {
                              }}
                            >
                              <Text className={`text-sm ${
-                               watchedValues.productiveTime === time ? 'font-bold text-blue-600' : 'text-black'
+                               watchedValues.productiveTime === time ? 'font-bold text-black' : 'text-black'
                              }`}>
                                {time}
                              </Text>
@@ -462,7 +462,7 @@ export default function PassportScreen() {
                       key={day}
                       className={`py-1 px-2 rounded-lg border ${
                         (watchedValues.energizedDays || '').includes(day)
-                          ? 'bg-blue-500 border-blue-600'
+                          ? 'bg-black border-black'
                           : 'bg-white border-gray-300'
                       }`}
                       onPress={() => {
@@ -500,7 +500,7 @@ export default function PassportScreen() {
                       key={option}
                       className={`py-1 px-2 rounded-lg border ${
                         watchedValues.meetingComfort === option
-                          ? 'bg-green-500 border-green-600'
+                          ? 'bg-black border-black'
                           : 'bg-white border-gray-300'
                       }`}
                       onPress={() => setValue('meetingComfort', option, { shouldValidate: true })}
@@ -535,7 +535,7 @@ export default function PassportScreen() {
                   key={signal}
                   className={`py-2 px-4 rounded-xl border-2 ${
                     (watchedValues.stressSignals || []).includes(signal)
-                      ? 'bg-blue-500 border-blue-600'
+                      ? 'bg-black border-black'
                       : 'bg-white border-black'
                   } ${!isEditMode ? 'opacity-60' : ''}`}
                   onPress={() => handleStressSignalToggle(signal)}
@@ -562,7 +562,7 @@ export default function PassportScreen() {
                   key={strategy}
                   className={`py-2 px-4 rounded-xl border-2 ${
                     (watchedValues.recoveryStrategies || []).includes(strategy)
-                      ? 'bg-green-500 border-green-600'
+                      ? 'bg-black border-black'
                       : 'bg-white border-black'
                   } ${!isEditMode ? 'opacity-60' : ''}`}
                   onPress={() => handleRecoveryStrategyToggle(strategy)}
@@ -667,7 +667,7 @@ export default function PassportScreen() {
             <TouchableOpacity
               className={`flex-1 py-3 px-4 rounded-xl border-2 flex-row items-center justify-center ${
                 isEditMode 
-                  ? 'bg-red-500 border-red-600' 
+                  ? 'bg-black border-black' 
                   : 'bg-white border-black'
               }`}
               onPress={handleEdit}

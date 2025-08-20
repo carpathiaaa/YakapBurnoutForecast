@@ -455,15 +455,15 @@ export class ForecastService {
   getTrendIcon(trend: BurnoutForecast['trend']): string {
     switch (trend) {
       case 'improving':
-        return '📈';
+        return 'trend-up';
       case 'stable':
-        return '➡️';
+        return 'trend-stable';
       case 'declining':
-        return '📉';
+        return 'trend-down';
       case 'critical':
-        return '🚨';
+        return 'alert';
       default:
-        return '❓';
+        return 'trend-stable';
     }
   }
 
@@ -487,6 +487,51 @@ export class ForecastService {
 
 // Export singleton instance
 export const forecastService = new ForecastService(); 
+
+// Manual forecast generation for testing
+export async function generateTestForecast(): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('User not authenticated');
+  
+  try {
+    // Get recent signals
+    const signalsQuery = query(
+      collection(db, 'wellness_signals'),
+      where('userId', '==', user.uid),
+      orderBy('timestamp', 'desc'),
+      fsLimit(20)
+    );
+    const signalsSnap = await getDocs(signalsQuery);
+    
+    if (signalsSnap.empty) {
+      console.log('[Test] No signals found, creating test signals');
+      // Create some test signals
+      const testSignals: WellnessSignal[] = [
+        {
+          type: 'check-in',
+          timestamp: new Date().toISOString(),
+          value: 75,
+          metadata: { emotionalState: 'good', energyLevel: 'high', stressLevel: 'low' }
+        },
+        {
+          type: 'sleep',
+          timestamp: new Date().toISOString(),
+          value: 80,
+          metadata: { sleepDuration: 'optimal', sleepQuality: 'good', hours: 8 }
+        }
+      ];
+      
+      const forecast = await forecastService.generateForecast(testSignals);
+      console.log('[Test] Generated forecast with score:', forecast.overallScore);
+    } else {
+      const signals = signalsSnap.docs.map(doc => doc.data() as WellnessSignal);
+      const forecast = await forecastService.generateForecast(signals);
+      console.log('[Test] Generated forecast with score:', forecast.overallScore);
+    }
+  } catch (error) {
+    console.error('[Test] Failed to generate test forecast:', error);
+  }
+}
 
 // Convenience helpers (free-tier): save a daily check-in (energy + sleep)
 export async function saveDailyCheckIn(energyRating: number, sleepHours: number): Promise<void> {
@@ -600,7 +645,7 @@ function deriveEmotionalWeather(
       label: trend === 'improving' ? 'Clear Skies' : 'Mostly Sunny',
       description: 'Energy is balanced and stress is manageable.',
       intensity: 'calm',
-      icon: '☀️',
+      icon: 'sun',
     };
   }
   if (risk === 'moderate') {
@@ -608,7 +653,7 @@ function deriveEmotionalWeather(
       label: trend === 'declining' ? 'Cloudy with Rising Tension' : 'Partly Cloudy',
       description: 'Noticeable stress signals. Plan recovery blocks.',
       intensity: 'moderate',
-      icon: '⛅',
+      icon: 'partly-cloudy',
     };
   }
   if (risk === 'high') {
@@ -616,14 +661,14 @@ function deriveEmotionalWeather(
       label: 'Storm Watch',
       description: 'Stress accumulation detected. Prioritize recovery today.',
       intensity: 'stormy',
-      icon: '🌧️',
+      icon: 'stormy',
     };
   }
   return {
     label: 'Critical Storm',
     description: 'High risk. Reduce load and seek support.',
     intensity: 'critical',
-    icon: '⛈️',
+    icon: 'critical',
   };
 }
 
@@ -632,6 +677,10 @@ export async function seedDummyDailyData(count: number = 50): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('User not authenticated');
   const base = new Date();
+  
+  // Collect signals for forecast generation
+  const signals: WellnessSignal[] = [];
+  
   for (let i = 0; i < count; i++) {
     const day = new Date(base.getTime() - i * 24 * 60 * 60 * 1000);
     const y = day.getFullYear();
@@ -641,6 +690,31 @@ export async function seedDummyDailyData(count: number = 50): Promise<void> {
 
     const energyRating = 1 + Math.floor(Math.random() * 5); // 1..5
     const sleepHours = Math.max(4, Math.min(10, Math.round(4 + Math.random() * 6)));
+
+    // Create signals for forecast generation
+    const energySignal: WellnessSignal = {
+      type: 'check-in',
+      timestamp: day.toISOString(),
+      value: Math.max(10, Math.min(90, energyRating * 20)),
+      metadata: {
+        emotionalState: energyRating >= 4 ? 'excellent' : energyRating === 3 ? 'okay' : 'poor',
+        energyLevel: energyRating >= 4 ? 'high' : energyRating === 3 ? 'moderate' : 'low',
+        stressLevel: 'low',
+      },
+    };
+    
+    const sleepSignal: WellnessSignal = {
+      type: 'sleep',
+      timestamp: day.toISOString(),
+      value: Math.max(0, Math.min(100, (sleepHours / 12) * 100)),
+      metadata: {
+        sleepDuration: sleepHours <= 4 ? 'very-poor' : sleepHours <= 6 ? 'insufficient' : sleepHours <= 7 ? 'adequate' : 'optimal',
+        sleepQuality: sleepHours >= 7 ? 'good' : 'fair',
+        hours: sleepHours,
+      },
+    };
+    
+    signals.push(energySignal, sleepSignal);
 
     // daily_checkins doc
     const checkinId = `${user.uid}_${dateKey}`;
@@ -668,5 +742,27 @@ export async function seedDummyDailyData(count: number = 50): Promise<void> {
       source: 'seed',
     }, { merge: true });
   }
+  
+  // Generate forecasts from the collected signals
+  try {
+    console.log('[Seed] Generating forecasts from', signals.length, 'signals');
+    
+    // Generate multiple forecasts over time
+    const forecastCount = Math.min(10, Math.floor(signals.length / 5)); // Generate up to 10 forecasts
+    for (let i = 0; i < forecastCount; i++) {
+      const forecastDate = new Date(base.getTime() - i * 7 * 24 * 60 * 60 * 1000); // Weekly forecasts
+      const signalsForForecast = signals.filter(signal => 
+        new Date(signal.timestamp) <= forecastDate
+      );
+      
+      if (signalsForForecast.length >= 5) { // Need at least 5 signals for a forecast
+        const forecast = await forecastService.generateForecast(signalsForForecast);
+        console.log('[Seed] Generated forecast', i + 1, 'with score:', forecast.overallScore);
+      }
+    }
+  } catch (error) {
+    console.warn('[Seed] Failed to generate forecasts:', error);
+  }
+  
   console.log('[Seed] Inserted dummy daily data:', count);
 }

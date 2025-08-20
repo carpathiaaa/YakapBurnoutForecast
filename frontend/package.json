@@ -6,7 +6,9 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "clear-cache": "node scripts/clear-cache.js",
+    "reset": "node scripts/clear-cache.js && expo start --clear"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^1.24.0",
@@ -39,6 +41,8 @@
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
+    "react-native-svg": "^15.12.1",
+    "react-native-svg-transformer": "^1.5.1",
     "react-native-vector-icons": "^10.2.0"
   },
   "devDependencies": {

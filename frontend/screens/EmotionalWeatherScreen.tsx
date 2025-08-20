@@ -5,8 +5,10 @@ import {useForm, Controller} from 'react-hook-form';
 import { collection, getDocs, query, where, limit as fsLimit } from 'firebase/firestore';
 import { db, auth } from '../services/firebase';
 import PersistentHeader from '../components/PersistentHeader';
+import { SvgIcon } from '../components/SvgIcon';
 import { fetchTrelloData, TrelloData, getUrgencyColor } from '../services/trello-service';
 import { forecastService, BurnoutForecast } from '../services/forecast-service';
+import { useFocusEffect } from '@react-navigation/native';
 
 
 interface EmotionalWeatherData {
@@ -43,6 +45,7 @@ export default function EmotionalWeatherScreen() {
   const [latestForecast, setLatestForecast] = useState<BurnoutForecast | null>(null);
   const [sleepDeltaPct, setSleepDeltaPct] = useState<number | null>(null);
   const [sleepDirection, setSleepDirection] = useState<'up' | 'down' | 'even' | null>(null);
+  const [forecastLoading, setForecastLoading] = useState(false);
   
   const daysOfWeek = [
     { key: 'M', label: 'M' },
@@ -53,6 +56,19 @@ export default function EmotionalWeatherScreen() {
     { key: 'Sa', label: 'Sa' },
     { key: 'Su', label: 'Su' }
   ];
+
+  const loadForecast = async () => {
+    try {
+      setForecastLoading(true);
+      const forecast = await forecastService.getLatestForecast();
+      setLatestForecast(forecast);
+      console.log('[Forecast] Updated forecast:', forecast?.emotionalWeather?.label);
+    } catch (err) {
+      console.error('Error loading forecast:', err);
+    } finally {
+      setForecastLoading(false);
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -124,6 +140,13 @@ export default function EmotionalWeatherScreen() {
     load();
   }, []);
 
+  // Refresh forecast when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadForecast();
+    }, [])
+  );
+
   const getTasksForSelectedDay = () => {
     if (!trelloData) return 0;
     
@@ -167,12 +190,25 @@ export default function EmotionalWeatherScreen() {
           <View className = "flex-1 p-4 justify-center">
             <Text className = "text-m text-black text-left mb-1">{new Date().toLocaleDateString()}</Text>
             <Text className = "text-3xl font-extrabold text-black text-left leading-tight mb-1">
-              {latestForecast?.emotionalWeather?.label ?? 'No forecast yet'}
+              {forecastLoading ? 'Updating...' : (latestForecast?.emotionalWeather?.label ?? 'No forecast yet')}
             </Text>
+            <TouchableOpacity 
+              onPress={loadForecast}
+              className="mt-2 bg-black px-3 py-1 rounded-lg self-start"
+            >
+              <Text className="text-white text-xs">Refresh Forecast</Text>
+            </TouchableOpacity>
           </View>
 
-          <View className = "flex-1 justify-center p-4">
-            <Text className = "text-xs text-black text-left mb-1 text-right">{latestForecast?.emotionalWeather?.icon ?? '⛅'}</Text>
+          <View className = "flex-1 justify-center p-4 items-end">
+            {forecastLoading ? (
+              <ActivityIndicator size="large" color="#000" />
+            ) : (
+              <SvgIcon 
+                name={latestForecast?.emotionalWeather?.icon ?? 'partly-cloudy'} 
+                size={48} 
+              />
+            )}
           </View>
         </View>
 
@@ -221,10 +257,10 @@ export default function EmotionalWeatherScreen() {
             {/* Right Column - Two stacked cards */}
             <View className="flex-1 gap-4">
               {/* Top Right Card - Sleep */}
-              <View className="bg-white rounded-xl border-2 border-black p-4">
-                <View className="flex-row items-center mb-2">
-                  <Text className="text-4xl mr-2">SLEEP ICON</Text>
-                </View>
+                             <View className="bg-white rounded-xl border-2 border-black p-4">
+                 <View className="flex-row items-center mb-2">
+                   <SvgIcon name="sleep" size={32} />
+                 </View>
                 {sleepDirection && sleepDeltaPct !== null ? (
                   <>
                     <Text className="text-sm text-gray-600">Sleep {sleepDirection}</Text>

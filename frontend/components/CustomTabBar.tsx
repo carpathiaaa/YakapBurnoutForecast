@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity, Text } from 'react-native';
+import { View, TouchableOpacity, Text, Image } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useModal } from '../navigation/MainNavigator';
 
@@ -7,11 +7,11 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
   const { openModal } = useModal();
 
   const tabIcons = [
-    { name: 'Settings', icon: '⚙️' },
-    { name: 'Weather', icon: '☀️' },
+    { name: 'Settings', icon: require('../assets/SETTINGS.png') },
+    { name: 'Weather', icon: require('../assets/WEATHER.png') },
     { name: 'Checkin', icon: '+' },
-    { name: 'Mirror', icon: '👥' },
-    { name: 'Passport', icon: '📄' },
+    { name: 'Mirror', icon: require('../assets/MIRROR.png') },
+    { name: 'Passport', icon: require('../assets/PASSPORT.png') },
   ];
 
   // Bar height and icon size
@@ -80,9 +80,21 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
                 }
                 style={{ width: iconSize, height: iconSize }}
               >
-                <Text className={`text-2xl ${isCentral ? 'text-black font-bold' : 'text-gray-600'}`}>
-                  {tabIcons[visibleIndex].icon}
-                </Text>
+                {isCentral ? (
+                  <Text className="text-2xl text-black font-bold">
+                    {tabIcons[visibleIndex].icon}
+                  </Text>
+                ) : (
+                  <Image
+                    source={tabIcons[visibleIndex].icon}
+                    style={{
+                      width: iconSize * 0.6,
+                      height: iconSize * 0.6,
+                      tintColor: isFocused ? '#000' : '#666',
+                      resizeMode: 'contain',
+                    }}
+                  />
+                )}
               </View>
             </TouchableOpacity>
           );

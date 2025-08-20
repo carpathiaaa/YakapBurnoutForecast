@@ -495,12 +495,12 @@ export class BurnoutForecastEngine {
   private generateEmotionalWeather(score: number, trend: BurnoutForecast['trend']): BurnoutForecast['emotionalWeather'] {
     const weatherPatterns = {
       // Positive weather patterns
-      'sunny': { label: 'Sunny with clear skies', intensity: 'calm' as const, icon: '☀️' },
-      'partly-cloudy': { label: 'Partly cloudy with gentle breeze', intensity: 'mild' as const, icon: '⛅' },
-      'cloudy': { label: 'Cloudy with scattered thoughts', intensity: 'moderate' as const, icon: '☁️' },
-      'overcast': { label: 'Overcast with rising tension', intensity: 'stormy' as const, icon: '🌥️' },
-      'stormy': { label: 'Stormy with emotional turbulence', intensity: 'stormy' as const, icon: '⛈️' },
-      'critical': { label: 'Hurricane conditions - immediate shelter needed', intensity: 'critical' as const, icon: '🌀' }
+      'sunny': { label: 'Sunny with clear skies', intensity: 'calm' as const, icon: 'sun' },
+      'partly-cloudy': { label: 'Partly cloudy with gentle breeze', intensity: 'mild' as const, icon: 'partly-cloudy' },
+      'cloudy': { label: 'Cloudy with scattered thoughts', intensity: 'moderate' as const, icon: 'cloudy' },
+      'overcast': { label: 'Overcast with rising tension', intensity: 'stormy' as const, icon: 'overcast' },
+      'stormy': { label: 'Stormy with emotional turbulence', intensity: 'stormy' as const, icon: 'stormy' },
+      'critical': { label: 'Hurricane conditions - immediate shelter needed', intensity: 'critical' as const, icon: 'critical' }
     };
 
     // Determine base weather based on score

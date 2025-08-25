@@ -110,7 +110,6 @@ export class ForecastService {
   async generateForecast(signals: WellnessSignal[], config?: any): Promise<BurnoutForecast> {
     try {
       const userId = this.getCurrentUserId();
-      console.log('[Forecast] generate start', { userId, signalsCount: signals.length });
       // Minimal heuristic forecast on client (placeholder)
       const now = new Date();
       const overallScore = Math.round(
@@ -135,7 +134,6 @@ export class ForecastService {
           processingTime: 1,
         },
       };
-      console.log('[Forecast] computed', { overallScore, riskLevel: forecast.riskLevel });
       // Save forecast to Firestore
       const forecastsCol = collection(db, 'burnout_forecasts');
       const forecastDoc = await addDoc(forecastsCol, {
@@ -155,7 +153,6 @@ export class ForecastService {
         processingTime: forecast.metadata.processingTime,
         timestamp: Timestamp.fromDate(new Date(forecast.timestamp)),
       });
-      console.log('[Forecast] saved', { docId: forecastDoc.id });
       return forecast;
     } catch (error) {
       console.error('❌ Error generating forecast (client mode):', error);
@@ -266,7 +263,6 @@ export class ForecastService {
   async saveSignals(signals: WellnessSignal[], source: string = 'manual'): Promise<void> {
     try {
       const userId = this.getCurrentUserId();
-      console.log('[Signals] writing', { userId, source, count: signals.length });
       const batch = writeBatch(db);
       signals.forEach((signal, index) => {
         const ref = doc(collection(db, 'wellness_signals'));
@@ -280,7 +276,6 @@ export class ForecastService {
         });
       });
       await batch.commit();
-      console.log('[Signals] committed');
     } catch (error) {
       console.error('❌ Error saving signals (client mode):', error);
       throw error;
@@ -545,7 +540,6 @@ export async function saveDailyCheckIn(energyRating: number, sleepHours: number)
   const emotionalState = energyRating >= 4 ? 'excellent' : energyRating === 3 ? 'okay' : 'poor';
   const energyLevel = energyRating >= 4 ? 'high' : energyRating === 3 ? 'moderate' : 'low';
   const energyValue = Math.max(10, Math.min(90, energyRating * 20));
-  console.log('[CheckIn] start', { uid: user.uid, energyRating, sleepHours });
 
   const energySignal: WellnessSignal = forecastService.createCheckInSignal(
     emotionalState,
@@ -563,7 +557,6 @@ export async function saveDailyCheckIn(energyRating: number, sleepHours: number)
       hours: sleepHours,
     },
   };
-  console.log('[CheckIn] signals', { energySignal, sleepSignal });
 
   // Save raw signals
   try {
@@ -571,7 +564,6 @@ export async function saveDailyCheckIn(energyRating: number, sleepHours: number)
   } catch (e) {
     console.error('[CheckIn] saveSignals failed', e);
   }
-  console.log('[CheckIn] signals saved');
 
   // Save a summarized daily_checkins document for easier queries
   // Check existence via query (compatible with read rules)
@@ -765,4 +757,139 @@ export async function seedDummyDailyData(count: number = 50): Promise<void> {
   }
   
   console.log('[Seed] Inserted dummy daily data:', count);
+}
+
+// Shared utility function for consistent date ranges across screens
+export function buildLastNDates(n: number): { key: string; label: string }[] {
+  const out: { key: string; label: string }[] = [];
+  
+  // Fixed day labels - always Sunday to Saturday
+  const fixedDayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - i);
+    const y = d.getFullYear();
+    const m = `${d.getMonth() + 1}`.padStart(2, '0');
+    const dd = `${d.getDate()}`.padStart(2, '0');
+    const key = `${y}-${m}-${dd}`;
+    
+    // Use fixed day labels based on position (6-i = 0 for first day, 6 for last day)
+    // This gives us: 6-6=0 (Sun), 6-5=1 (Mon), 6-4=2 (Tue), etc.
+    const label = fixedDayLabels[6 - i];
+    
+    out.push({ key, label });
+  }
+  return out;
+}
+
+// Shared function to get sleep data for consistent date ranges
+export async function getSleepDataForDateRange(days: number = 7) {
+  const user = auth.currentUser;
+  if (!user) return { sleepData: [], meetingsData: [] };
+
+  const lastNDates = buildLastNDates(days);
+  
+  // Fetch recent docs (last 50) and reduce to last N days
+  const dcQ = query(
+    collection(db, 'daily_checkins'),
+    where('userId', '==', user.uid),
+    fsLimit(50)
+  );
+  const mdQ = query(
+    collection(db, 'meetings_daily'),
+    where('userId', '==', user.uid),
+    fsLimit(50)
+  );
+  
+  const [dcSnap, mdSnap] = await Promise.all([getDocs(dcQ), getDocs(mdQ)]);
+
+  const byKeySleep: Record<string, number> = {};
+  dcSnap.forEach((docSnap) => {
+    const d = docSnap.data() as any;
+    const key: string | undefined = d.dateKey || '';
+    if (!key) return;
+    byKeySleep[key] = Number(d.sleepHours) || 0;
+  });
+
+  const byKeyMeetings: Record<string, number> = {};
+  mdSnap.forEach((docSnap) => {
+    const d = docSnap.data() as any;
+    let key: string | undefined = d.dateKey;
+    if (!key) {
+      const ts: any = d.timestamp;
+      const date: Date | null = (ts?.toDate && ts.toDate()) || (ts ? new Date(ts) : null);
+      if (date) {
+        const y = date.getFullYear();
+        const m = `${date.getMonth() + 1}`.padStart(2, '0');
+        const dd = `${date.getDate()}`.padStart(2, '0');
+        key = `${y}-${m}-${dd}`;
+      }
+    }
+    if (!key) return;
+    const meetingsValue = d.count ?? d.meetings;
+    byKeyMeetings[key] = Number(meetingsValue) || 0;
+  });
+
+  const sleepData = lastNDates.map((d) => ({ day: d.label, hours: byKeySleep[d.key] ?? 0 }));
+  const meetingsData = lastNDates.map((d) => ({ day: d.label, meetings: byKeyMeetings[d.key] ?? 0 }));
+
+  return { sleepData, meetingsData };
+}
+
+// Unified sleep delta calculation function
+export function calculateSleepDelta(sleepData: { day: string; hours: number }[]): {
+  deltaPct: number | null;
+  direction: 'up' | 'down' | 'even' | null;
+  todayHours: number;
+  averageHours: number;
+} {
+  if (!sleepData || sleepData.length === 0) {
+    return { deltaPct: null, direction: null, todayHours: 0, averageHours: 0 };
+  }
+
+  // Get today's day of week (0 = Sunday, 1 = Monday, etc.)
+  const today = new Date();
+  const todayDayOfWeek = today.getDay(); // 0-6
+  
+  // Map day of week to our fixed labels
+  const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const todayLabel = dayLabels[todayDayOfWeek];
+  
+  // Find today's data in the array
+  const todayData = sleepData.find(d => d.day === todayLabel);
+  const todayHours = todayData?.hours || 0;
+  
+  // Get baseline data (all days except today with valid sleep data)
+  const baselineData = sleepData
+    .filter(d => d.day !== todayLabel && d.hours > 0); // Exclude today and days with no data
+
+  if (baselineData.length === 0 || todayHours === 0) {
+    return { deltaPct: null, direction: null, todayHours, averageHours: 0 };
+  }
+
+  // Calculate average baseline sleep
+  const totalBaselineHours = baselineData.reduce((sum, d) => sum + d.hours, 0);
+  const averageHours = totalBaselineHours / baselineData.length;
+
+  if (averageHours === 0) {
+    return { deltaPct: null, direction: null, todayHours, averageHours: 0 };
+  }
+
+  // Calculate delta
+  const diff = todayHours - averageHours;
+  const deltaPct = Math.round((Math.abs(diff) / averageHours) * 100);
+  
+  // Determine direction
+  let direction: 'up' | 'down' | 'even';
+  if (diff > 0) {
+    direction = 'up';
+  } else if (diff < 0) {
+    direction = 'down';
+  } else {
+    direction = 'even';
+  }
+
+  return { deltaPct, direction, todayHours, averageHours };
 }

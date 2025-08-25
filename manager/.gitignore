@@ -1,0 +1,8 @@
+node_modules/
+manager/server/firebaseAdmin/serviceAccount/
+server/node_modules/
+server/firebaseAdmin/serviceAccount/
+
+client/node_modules/
+
+
